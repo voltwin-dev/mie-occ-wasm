@@ -1,3 +1,10 @@
+// Copyright (c) 2025 SolverX Corporation
+// This file is part of MIE OpenCascade WebAssembly Bindings.
+//
+// This library is free software; you can redistribute it and/or modify it under
+// the terms of the GNU Lesser General Public License version 2.1 as published
+// by the Free Software Foundation.
+
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
