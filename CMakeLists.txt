@@ -1,0 +1,103 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(mie-occ-wasm)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(TARGET mie-occ-wasm)
+set(CMAKE_CONFIGURATION_TYPES Debug;Release)
+set(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
+cmake_path(SET OCCT_PATH ${CMAKE_SOURCE_DIR}/build/occt)
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    cmake_path(SET CMAKE_INSTALL_PREFIX NORMALIZE ${CMAKE_SOURCE_DIR}/../src/occ_wasm/release)
+else()
+    cmake_path(SET CMAKE_INSTALL_PREFIX NORMALIZE ${CMAKE_SOURCE_DIR}/../src/occ_wasm/debug)
+endif()
+
+cmake_path(RELATIVE_PATH OCCT_PATH BASE_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+set(MIE_OCCT_TOOLKITS
+    TKernel TKMath 
+)
+
+include(${OCCT_PATH}/adm/cmake/occt_macros.cmake)
+
+set(MIE_USED_OCCT_TOOLKIT_PACKAGES)
+foreach(OCCT_TOOLKIT ${MIE_OCCT_TOOLKITS})
+    EXTRACT_TOOLKIT_PACKAGES(${OCCT_PATH}/src ${OCCT_TOOLKIT} OCCT_PACKAGES)
+    list(APPEND MIE_USED_OCCT_TOOLKIT_PACKAGES ${OCCT_PACKAGES})
+endforeach()
+list(REMOVE_DUPLICATES MIE_USED_OCCT_TOOLKIT_PACKAGES)
+
+set(MIE_OCCT_SOURCE_FOLDERS)
+set(MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS)
+foreach(OCCT_PACKAGE ${MIE_USED_OCCT_TOOLKIT_PACKAGES})
+    list(APPEND MIE_OCCT_SOURCE_FOLDERS ${OCCT_PATH}/src/${OCCT_PACKAGE}/*.c*)
+    list(APPEND MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS ${OCCT_PATH}/src/${OCCT_PACKAGE})
+endforeach()
+
+include(${OCCT_PATH}/adm/cmake/version.cmake)
+configure_file("${OCCT_PATH}/adm/templates/Standard_Version.hxx.in" "include/Standard_Version.hxx" @ONLY)
+list(APPEND MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+file(GLOB MIE_OCCT_SOURCE_FILES ${MIE_OCCT_SOURCE_FOLDERS})
+
+file(GLOB
+    MIE_BINDING_SOURCES CONFIGURE_DEPENDS
+    src/*.hpp
+    src/*.cpp
+)
+
+source_group("Sources" FILES ${MIE_BINDING_SOURCES})
+source_group("OCCT" FILES ${MIE_OCCT_SOURCE_FILES})
+
+if(EMSCRIPTEN)
+    set(SHARED_COMPILE_FLAGS)
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        list(APPEND SHARED_COMPILE_FLAGS
+            -O3
+            -flto
+            -sDISABLE_EXCEPTION_CATCHING=1
+        )
+    else()
+        list(APPEND SHARED_COMPILE_FLAGS
+            -O0
+            -fno-lto
+            -sDISABLE_EXCEPTION_CATCHING=0
+        )
+    endif()
+
+    add_library(occt STATIC ${MIE_OCCT_SOURCE_FILES})
+    target_include_directories(occt PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
+    target_compile_options(occt PRIVATE
+        ${SHARED_COMPILE_FLAGS}
+        -Wno-character-conversion
+        -Wno-deprecated-pragma
+        -Wno-deprecated-declarations
+        -DOCCT_NO_PLUGINS
+    )
+
+    add_executable(${TARGET} ${MIE_BINDING_SOURCES})
+    target_include_directories(${TARGET} PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
+    target_compile_options(${TARGET} PRIVATE
+        ${SHARED_COMPILE_FLAGS}
+        -Wno-deprecated-declarations
+    )
+    target_link_libraries(${TARGET} PRIVATE occt)
+    target_link_options(${TARGET} PRIVATE
+        ${SHARED_COMPILE_FLAGS}
+        -sMODULARIZE=1
+        -sEXPORT_ES6=1
+        -sSTACK_SIZE=8MB
+        -sINITIAL_HEAP=64MB
+        -sMAXIMUM_MEMORY=4GB
+        -sALLOW_MEMORY_GROWTH=1
+        -sENVIRONMENT=web
+        --bind
+        --emit-tsd "${TARGET}.d.ts"
+    )
+
+    install(TARGETS ${TARGET} DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.wasm DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.d.ts DESTINATION ${CMAKE_INSTALL_PREFIX})
+endif()
