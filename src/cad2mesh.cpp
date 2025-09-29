@@ -83,7 +83,20 @@ public:
     }
 
 private:
-    static bool resolveLabelColor(
+    static TDF_Label resolveReferredShapeLabel(
+        const TDF_Label& label,
+        Handle(XCAFDoc_ShapeTool)& shapeTool
+    ) {
+        TDF_Label resolvedLabel = label;
+        while (XCAFDoc_ShapeTool::IsReference(resolvedLabel)) {
+            TDF_Label refLabel;
+            shapeTool->GetReferredShape(resolvedLabel, refLabel);
+            resolvedLabel = refLabel;
+        }
+        return resolvedLabel;
+    }
+
+    static bool getLabelColor(
         const TDF_Label& label,
         Handle(XCAFDoc_ShapeTool)& shapeTool,
         Handle(XCAFDoc_ColorTool)& colorTool,
@@ -95,17 +108,10 @@ private:
                 return true;
             }
         }
-
-        if (XCAFDoc_ShapeTool::IsReference(label)) {
-            TDF_Label refLabel;
-            shapeTool->GetReferredShape(label, refLabel);
-            return resolveLabelColor(refLabel, shapeTool, colorTool, color);
-        }
-
         return false;
     }
 
-    static std::string resolveLabelName(
+    static std::string getLabelName(
         const TDF_Label& label,
         Handle(XCAFDoc_ShapeTool)& shapeTool
     ) {
@@ -128,14 +134,16 @@ private:
         int level = 0
     ) {
         std::cout << "Level " << level << " Label Tag: " << label.Tag() << std::endl;
-        std::string name = resolveLabelName(label, shapeTool);
+
+        TDF_Label resolvedLabel = resolveReferredShapeLabel(label, shapeTool);
+        std::string name = getLabelName(resolvedLabel, shapeTool);
         if (!name.empty()) {
             std::cout << "Label Name: " << name << std::endl;
         } else {
             std::cout << "No label name found." << std::endl;
         }
         Quantity_Color color;
-        if (resolveLabelColor(label, shapeTool, colorTool, color)) {
+        if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
             std::cout << "Label Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
         } else {
             std::cout << "No label color found." << std::endl;
@@ -189,14 +197,15 @@ private:
     ) {
         TDF_Label shapeLabel;
         if (shapeTool->Search(shape, shapeLabel)) {
-            std::string shapeName = resolveLabelName(shapeLabel, shapeTool);
+            TDF_Label resolvedLabel = resolveReferredShapeLabel(shapeLabel, shapeTool);
+            std::string shapeName = getLabelName(resolvedLabel, shapeTool);
             if (!shapeName.empty()) {
                 std::cout << "Shape Name: " << shapeName << std::endl;
             } else {
                 std::cout << "No shape name found." << std::endl;
             }
             Quantity_Color color;
-            if (resolveLabelColor(shapeLabel, shapeTool, colorTool, color)) {
+            if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
                 std::cout << "Shape Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
             } else {
                 std::cout << "No shape color found." << std::endl;
