@@ -5,10 +5,8 @@
 // the terms of the GNU Lesser General Public License version 2.1 as published
 // by the Free Software Foundation.
 
-#include "common.hpp"
+#pragma once
 
-#include <emscripten/bind.h>
+#include <emscripten/val.h>
 
-EMSCRIPTEN_BINDINGS(common_module) {
-    emscripten::register_type<Uint8Array>("Uint8Array");
-}
+EMSCRIPTEN_DECLARE_VAL_TYPE(Uint8Array);
