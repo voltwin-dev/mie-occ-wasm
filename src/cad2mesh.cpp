@@ -75,7 +75,7 @@ public:
             TopoDS_Shape shape;
             if (shapeTool->GetShape(childLabel, shape) && shapeTool->IsFree(childLabel)) {
                 // free shapes (root nodes)
-                resolveLabelRecursively(childLabel, shapeTool, colorTool);
+                resolveShapeTree(shape, shapeTool, colorTool);
             }
         }
         
@@ -102,7 +102,7 @@ private:
         Handle(XCAFDoc_ColorTool)& colorTool,
         Quantity_Color& color
     ) {
-        static const std::vector<XCAFDoc_ColorType> colorTypes = { XCAFDoc_ColorSurf, XCAFDoc_ColorCurv, XCAFDoc_ColorGen };
+        static constexpr std::array<XCAFDoc_ColorType, 3> colorTypes = { XCAFDoc_ColorSurf, XCAFDoc_ColorCurv, XCAFDoc_ColorGen };
         for (XCAFDoc_ColorType colorType : colorTypes) {
             if (colorTool->GetColor(label, colorType, color)) {
                 return true;
@@ -127,100 +127,51 @@ private:
         return "";
     }
 
-    static void resolveLabelRecursively(
-        const TDF_Label& label,
-        Handle(XCAFDoc_ShapeTool)& shapeTool,
-        Handle(XCAFDoc_ColorTool)& colorTool,
-        int level = 0
-    ) {
-        std::cout << "Level " << level << " Label Tag: " << label.Tag() << std::endl;
-
-        TDF_Label resolvedLabel = resolveReferredShapeLabel(label, shapeTool);
-        std::string name = getLabelName(resolvedLabel, shapeTool);
-        if (!name.empty()) {
-            std::cout << "Label Name: " << name << std::endl;
-        } else {
-            std::cout << "No label name found." << std::endl;
-        }
-        Quantity_Color color;
-        if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
-            std::cout << "Label Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
-        } else {
-            std::cout << "No label color found." << std::endl;
-        }
-
-        bool readShape = false;
-        {
-            if (!label.HasChild()) {
-                readShape = true;
-            }
-            TDF_ChildIterator it(label);
-            for (; it.More(); it.Next()) {
-                TDF_Label childLabel = it.Value();
-                
-                if (shapeTool->IsSubShape(childLabel)) {
-                    readShape = true;
-                    break;
-                }
-                
-                TopoDS_Shape childShape;
-                if (shapeTool->GetShape(childLabel, childShape) && shapeTool->IsFree(childLabel)) {
-                    readShape = true;
-                    break;
-                }
-            }
-        }
-
-        if (readShape) {
-            TopoDS_Shape shape = shapeTool->GetShape(label);
-            resolveShapeRecursively(shape, shapeTool, colorTool);
-        } else {
-            TDF_ChildIterator it(label);
-            for (; it.More(); it.Next()) {
-                TDF_Label childLabel = it.Value();
-
-                std::cout << "Child Label Tag: " << childLabel.Tag() << std::endl;
-
-                TopoDS_Shape childShape;
-                if (shapeTool->GetShape(childLabel, childShape) && shapeTool->IsFree(childLabel)) {
-                    std::cout << "Free Shape Found?" << std::endl;
-                    resolveLabelRecursively(childLabel, shapeTool, colorTool, level + 1);
-                }
-            }
-        }
-    }
-
-    static void resolveShapeRecursively(
-        const TopoDS_Shape& shape,
+    static void resolveShapeTree(
+        const TopoDS_Shape& rootShape,
         Handle(XCAFDoc_ShapeTool)& shapeTool,
         Handle(XCAFDoc_ColorTool)& colorTool
     ) {
-        TDF_Label shapeLabel;
-        if (shapeTool->Search(shape, shapeLabel)) {
-            TDF_Label resolvedLabel = resolveReferredShapeLabel(shapeLabel, shapeTool);
-            std::string shapeName = getLabelName(resolvedLabel, shapeTool);
-            if (!shapeName.empty()) {
-                std::cout << "Shape Name: " << shapeName << std::endl;
-            } else {
-                std::cout << "No shape name found." << std::endl;
-            }
-            Quantity_Color color;
-            if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
-                std::cout << "Shape Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
-            } else {
-                std::cout << "No shape color found." << std::endl;
-            }
-        }
+        struct StackFrame {
+            TopoDS_Shape shape;
+            int level;
+        };
+        std::vector<StackFrame> stack;
+        stack.push_back({ rootShape, 0 });
 
-        if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID) {
-            std::cout << "Compound shape with " << shape.NbChildren() << " children." << std::endl;
-            TopoDS_Iterator it(shape);
-            for (; it.More(); it.Next()) {
-                TopoDS_Shape subShape = it.Value();
-                resolveShapeRecursively(subShape, shapeTool, colorTool);
+        while (!stack.empty()) {
+            auto [shape, level] = stack.back();
+            stack.pop_back();
+
+            std::cout << "level " << level << ": ";
+
+            TDF_Label shapeLabel;
+            if (shapeTool->Search(shape, shapeLabel)) {
+                TDF_Label resolvedLabel = resolveReferredShapeLabel(shapeLabel, shapeTool);
+                std::string shapeName = getLabelName(resolvedLabel, shapeTool);
+                if (!shapeName.empty()) {
+                    std::cout << "Shape Name: " << shapeName << ' ';
+                } else {
+                    std::cout << "No shape name. ";
+                }
+                Quantity_Color color;
+                if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
+                    std::cout << "Shape Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue();
+                } else {
+                    std::cout << "No shape color.";
+                }
             }
-        } else {
-            std::cout << "Leaf shape type: " << shape.ShapeType() << std::endl;
+
+            // resolve sub-shapes if compound shape
+            if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID) {
+                std::cout << "Compound shape with " << shape.NbChildren() << " children." << std::endl;
+                TopoDS_Iterator it(shape);
+                for (; it.More(); it.Next()) {
+                    stack.push_back({ it.Value(), level + 1 });
+                }
+            } else {
+                std::cout << "Leaf shape type: " << shape.ShapeType() << std::endl;
+            }
         }
     }
 };
