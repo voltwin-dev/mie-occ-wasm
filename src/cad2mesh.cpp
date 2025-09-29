@@ -85,20 +85,23 @@ public:
 private:
     static bool resolveLabelColor(
         const TDF_Label& label,
+        Handle(XCAFDoc_ShapeTool)& shapeTool,
         Handle(XCAFDoc_ColorTool)& colorTool,
         Quantity_Color& color
     ) {
-        TDF_Label colorLabel;
-        if (colorTool->GetColor(label, color)) {
-            return true;
-        }
-        TDF_Label parentLabel = label.Father();
-        while (!parentLabel.IsNull()) {
-            if (colorTool->GetColor(parentLabel, color)) {
+        static const std::vector<XCAFDoc_ColorType> colorTypes = { XCAFDoc_ColorSurf, XCAFDoc_ColorCurv, XCAFDoc_ColorGen };
+        for (XCAFDoc_ColorType colorType : colorTypes) {
+            if (colorTool->GetColor(label, colorType, color)) {
                 return true;
             }
-            parentLabel = parentLabel.Father();
         }
+
+        if (XCAFDoc_ShapeTool::IsReference(label)) {
+            TDF_Label refLabel;
+            shapeTool->GetReferredShape(label, refLabel);
+            return resolveLabelColor(refLabel, shapeTool, colorTool, color);
+        }
+
         return false;
     }
 
@@ -132,7 +135,7 @@ private:
             std::cout << "No label name found." << std::endl;
         }
         Quantity_Color color;
-        if (resolveLabelColor(label, colorTool, color)) {
+        if (resolveLabelColor(label, shapeTool, colorTool, color)) {
             std::cout << "Label Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
         } else {
             std::cout << "No label color found." << std::endl;
@@ -193,7 +196,7 @@ private:
                 std::cout << "No shape name found." << std::endl;
             }
             Quantity_Color color;
-            if (resolveLabelColor(shapeLabel, colorTool, color)) {
+            if (resolveLabelColor(shapeLabel, shapeTool, colorTool, color)) {
                 std::cout << "Shape Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue() << std::endl;
             } else {
                 std::cout << "No shape color found." << std::endl;
