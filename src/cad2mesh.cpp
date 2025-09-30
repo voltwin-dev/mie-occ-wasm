@@ -28,6 +28,17 @@
 #include <TDataStd_Name.hxx>
 #include <Standard_Failure.hxx>
 #include <TopoDS_Iterator.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopoDS.hxx>
+#include <BRep_Tool.hxx>
+#include <TopoDS_Face.hxx>
+#include <BRepLib_ToolTriangulatedShape.hxx>
+#include <Poly_Triangulation.hxx>
+#include <TopLoc_Location.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepTools.hxx>
 
 #include "common.hpp"
 
@@ -52,6 +63,7 @@ public:
 
         Handle(TDocStd_Document) doc = new TDocStd_Document("BinXCAF");
         try {
+            OCC_CATCH_SIGNALS
             IFSelect_ReturnStatus status = stepCafReader.ReadStream("stp", stream);
             if (status != IFSelect_RetDone) {
                 return false;
@@ -171,6 +183,43 @@ private:
                 }
             } else {
                 std::cout << "Leaf shape type: " << shape.ShapeType() << std::endl;
+                
+
+                constexpr double ANGLE_DEFLECTION = 0.2;
+                BRepMesh_IncrementalMesh mesh(shape, 0.002, true, ANGLE_DEFLECTION, true);
+
+                TopTools_IndexedMapOfShape facesIndexedMap;
+                TopExp::MapShapes(shape, TopAbs_FACE, facesIndexedMap);
+                std::cout << "  Faces: " << facesIndexedMap.Extent() << std::endl;
+
+                TopTools_IndexedMapOfShape::Iterator faceIt(facesIndexedMap);
+                for (; faceIt.More(); faceIt.Next()) {
+                    TopoDS_Face face = TopoDS::Face(faceIt.Value());
+                    std::cout << "    Face: " << std::endl;
+                    
+                    TopLoc_Location location;
+                    Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(face, location);
+                    if (!polyTri.IsNull()) {
+                        gp_Trsf shapeTransform = location.Transformation();
+                        
+                        for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
+                            gp_Pnt pnt = polyTri->Node(i).Transformed(shapeTransform);
+                            std::cout << "      Vertex: " << pnt.X() << ", " << pnt.Y() << ", " << pnt.Z() << std::endl;
+                        }
+
+                        Standard_Boolean flipNormals = (face.Orientation() == TopAbs_REVERSED) ^ (shapeTransform.VectorialPart().Determinant() < 0);
+
+                        BRepLib_ToolTriangulatedShape::ComputeNormals(face, polyTri);
+                        for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
+                            gp_Dir normal = polyTri->Normal(i).Transformed(shapeTransform);
+                            std::cout << "      Normal: " << normal.X() << ", " << normal.Y() << ", " << normal.Z() << std::endl;
+                        }
+                    }
+                }
+
+                TopTools_IndexedMapOfShape edgesIndexedMap;
+                TopExp::MapShapes(shape, TopAbs_EDGE, edgesIndexedMap);
+                std::cout << "  Edges: " << edgesIndexedMap.Extent() << std::endl;
             }
         }
     }
