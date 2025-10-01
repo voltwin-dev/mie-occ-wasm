@@ -17,7 +17,7 @@ endif()
 cmake_path(RELATIVE_PATH OCCT_PATH BASE_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 set(MIE_OCCT_TOOLKITS
-    TKernel TKMath 
+    TKernel
 )
 
 include(${OCCT_PATH}/adm/cmake/occt_macros.cmake)
@@ -53,16 +53,16 @@ source_group("OCCT" FILES ${MIE_OCCT_SOURCE_FILES})
 
 if(EMSCRIPTEN)
     set(SHARED_COMPILE_FLAGS)
+    list(APPEND SHARED_COMPILE_FLAGS
+        -O3
+        -flto
+    )
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         list(APPEND SHARED_COMPILE_FLAGS
-            -O3
-            -flto
             -sDISABLE_EXCEPTION_CATCHING=1
         )
     else()
         list(APPEND SHARED_COMPILE_FLAGS
-            -O0
-            -fno-lto
             -sDISABLE_EXCEPTION_CATCHING=0
         )
     endif()

@@ -11,4 +11,6 @@
 
 EMSCRIPTEN_BINDINGS(common_module) {
     emscripten::register_type<Uint8Array>("Uint8Array");
+    emscripten::register_type<Uint32Array>("Uint32Array");
+    emscripten::register_type<Float32Array>("Float32Array");
 }

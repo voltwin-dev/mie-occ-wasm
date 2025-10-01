@@ -188,13 +188,9 @@ private:
                 constexpr double ANGLE_DEFLECTION = 0.2;
                 BRepMesh_IncrementalMesh mesh(shape, 0.002, true, ANGLE_DEFLECTION, true);
 
-                TopTools_IndexedMapOfShape facesIndexedMap;
-                TopExp::MapShapes(shape, TopAbs_FACE, facesIndexedMap);
-                std::cout << "  Faces: " << facesIndexedMap.Extent() << std::endl;
-
-                TopTools_IndexedMapOfShape::Iterator faceIt(facesIndexedMap);
-                for (; faceIt.More(); faceIt.Next()) {
-                    TopoDS_Face face = TopoDS::Face(faceIt.Value());
+                TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
+                for (; faceExplorer.More(); faceExplorer.Next()) {
+                    TopoDS_Face face = TopoDS::Face(faceExplorer.Current());
                     std::cout << "    Face: " << std::endl;
                     
                     TopLoc_Location location;
