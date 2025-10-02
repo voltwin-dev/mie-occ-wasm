@@ -177,4 +177,6 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
     emscripten::class_<ModelContext>("ModelContext")
         .function("computeTriangulation", &ModelContext::computeTriangulation)
         .function("getTriangulatedModel", &ModelContext::getTriangulatedModel);
+
+    emscripten::register_optional<ModelContext>();
 }
