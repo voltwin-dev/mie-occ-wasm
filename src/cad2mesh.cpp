@@ -12,7 +12,6 @@
 #include <vector>
 #include <streambuf>
 #include <istream>
-#include <iostream>
 
 #include <STEPCAFControl_Reader.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -155,34 +154,48 @@ private:
             auto [shape, level] = stack.back();
             stack.pop_back();
 
-            std::cout << "level " << level << ": ";
+            EM_ASM({
+                console.log("Level: " + $0);
+            }, level);
 
             TDF_Label shapeLabel;
             if (shapeTool->Search(shape, shapeLabel)) {
                 TDF_Label resolvedLabel = resolveReferredShapeLabel(shapeLabel, shapeTool);
                 std::string shapeName = getLabelName(resolvedLabel, shapeTool);
                 if (!shapeName.empty()) {
-                    std::cout << "Shape Name: " << shapeName << ' ';
+                    EM_ASM({
+                        console.log("Shape Name: " + UTF8ToString($0));
+                    }, shapeName.c_str());
                 } else {
-                    std::cout << "No shape name. ";
+                    EM_ASM({
+                        console.log("No shape name.");
+                    });
                 }
                 Quantity_Color color;
                 if (getLabelColor(resolvedLabel, shapeTool, colorTool, color)) {
-                    std::cout << "Shape Color: R=" << color.Red() << " G=" << color.Green() << " B=" << color.Blue();
+                    EM_ASM({
+                        console.log("Shape Color: R=" + $0 + " G=" + $1 + " B=" + $2);
+                    }, color.Red(), color.Green(), color.Blue());
                 } else {
-                    std::cout << "No shape color.";
+                    EM_ASM({
+                        console.log("No shape color.");
+                    });
                 }
             }
 
             // resolve sub-shapes if compound shape
             if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID) {
-                std::cout << "Compound shape with " << shape.NbChildren() << " children." << std::endl;
+                EM_ASM({
+                    console.log("Compound shape with " + $0 + " children.");
+                }, shape.NbChildren());
                 TopoDS_Iterator it(shape);
                 for (; it.More(); it.Next()) {
                     stack.push_back({ it.Value(), level + 1 });
                 }
             } else {
-                std::cout << "Leaf shape type: " << shape.ShapeType() << std::endl;
+                EM_ASM({
+                    console.log("Leaf shape type: " + $0);
+                }, shape.ShapeType());
                 
                 constexpr double ANGLE_DEFLECTION = 0.2;
                 BRepMesh_IncrementalMesh mesh(
@@ -196,7 +209,9 @@ private:
                 TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
                 for (; faceExplorer.More(); faceExplorer.Next()) {
                     TopoDS_Face face = TopoDS::Face(faceExplorer.Current());
-                    std::cout << "    Face: " << std::endl;
+                    EM_ASM({
+                        console.log("Face found.");
+                    });
                     
                     TopLoc_Location location;
                     Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(face, location);
@@ -205,7 +220,9 @@ private:
                         
                         for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
                             gp_Pnt pnt = polyTri->Node(i).Transformed(shapeTransform);
-                            std::cout << "      Vertex: " << pnt.X() << ", " << pnt.Y() << ", " << pnt.Z() << std::endl;
+                            EM_ASM({
+                                console.log("Vertex: " + $0 + ", " + $1 + ", " + $2);
+                            }, pnt.X(), pnt.Y(), pnt.Z());
                         }
 
                         Standard_Boolean flipNormals = (face.Orientation() == TopAbs_REVERSED) ^ (shapeTransform.VectorialPart().Determinant() < 0);
@@ -213,14 +230,18 @@ private:
                         BRepLib_ToolTriangulatedShape::ComputeNormals(face, polyTri);
                         for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
                             gp_Dir normal = polyTri->Normal(i).Transformed(shapeTransform);
-                            std::cout << "      Normal: " << normal.X() << ", " << normal.Y() << ", " << normal.Z() << std::endl;
+                            EM_ASM({
+                                console.log("Normal: " + $0 + ", " + $1 + ", " + $2);
+                            }, normal.X(), normal.Y(), normal.Z());
                         }
                     }
                 }
 
                 TopTools_IndexedMapOfShape edgesIndexedMap;
                 TopExp::MapShapes(shape, TopAbs_EDGE, edgesIndexedMap);
-                std::cout << "  Edges: " << edgesIndexedMap.Extent() << std::endl;
+                EM_ASM({
+                    console.log("Edges: " + $0);
+                }, edgesIndexedMap.Extent());
             }
         }
     }

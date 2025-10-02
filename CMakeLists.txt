@@ -144,7 +144,11 @@ if(EMSCRIPTEN)
         --bind
         --emit-tsd "${TARGET}.d.ts"
     )
-    if (NOT MIE_ENABLE_MULTITHREAD)
+    if (MIE_ENABLE_MULTITHREAD)
+        target_link_options(${TARGET} PRIVATE
+            -sPTHREAD_POOL_SIZE='navigator.hardwareConcurrency'
+        )
+    else()
         target_link_options(${TARGET} PRIVATE
             -sINITIAL_HEAP=64MB
         )
