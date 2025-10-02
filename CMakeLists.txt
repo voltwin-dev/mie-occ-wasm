@@ -17,7 +17,40 @@ endif()
 cmake_path(RELATIVE_PATH OCCT_PATH BASE_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 set(MIE_OCCT_TOOLKITS
-    TKernel
+    # Search from STEPCAFControl_Reader deps
+    TKernel # for Standard.hxx
+    TKXSBase # for XSControl_Reader.hxx
+    TKDE # for DE_ShapeFixParameters.hxx
+    TKG3d # for TopAbs_ShapeEnum.hxx
+    TKShHealing # for ShapeProcess.hxx
+    TKBRep # for TopTools_SequenceOfShape.hxx
+    TKMath # for TopLoc_Location.hxx
+    TKLCAF # for TDF_LabelSequence.hxx
+    TKXCAF # for XCAFDoc_DataMapOfShapeLabel.hxx
+    TKDESTEP # for STEPControl_Reader.hxx
+
+    # Search from TDocStd_Document deps
+    TKCDF # for CDM_Document.hxx
+    
+    # Search from BRep_Builder deps
+    TKG2d # for Geom2d_Curve.hxx
+
+    # Search from BRepLib_ToolTriangulatedShape deps
+    TKTopAlgo # for BRepLib_ToolTriangulatedShape.hxx
+
+    # Search from BRepMesh_IncrementalMesh deps
+    TKMesh # for BRepMesh_IncrementalMesh.hxx
+
+    # Additional Build Error Fixes
+    TKGeomBase # for GeomProjLib.hxx
+    TKGeomAlgo # for IntSurf_LineOn2S.hxx
+    TKService # for Graphic3d_AlphaMode.hxx
+    TKCAF # for TNaming_NamedShape.hxx
+    TKVCAF # for TPrsStd_DriverTable.hxx
+    TKBO # for IntTools_FClass2d.hxx
+    TKV3d # for AIS_InteractiveContext.hxx
+    TKHLR # for HLRBRep.hxx
+    TKPrim # for BRepPrimAPI_MakeBox.hxx
 )
 
 include(${OCCT_PATH}/adm/cmake/occt_macros.cmake)
