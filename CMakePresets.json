@@ -8,32 +8,62 @@
             "toolchainFile": "build/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
         },
         {
-            "name": "debug",
+            "name": "debug-single",
             "inherits": "base",
-            "binaryDir": "build/target/debug",
+            "binaryDir": "build/target/debug-single",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
-            "name": "release",
+            "name": "release-single",
             "inherits": "base",
-            "binaryDir": "build/target/release",
+            "binaryDir": "build/target/release-single",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug-multi",
+            "inherits": "base",
+            "binaryDir": "build/target/debug-multi",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MIE_ENABLE_MULTITHREAD": "ON"
+            }
+        },
+        {
+            "name": "release-multi",
+            "inherits": "base",
+            "binaryDir": "build/target/release-multi",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "MIE_ENABLE_MULTITHREAD": "ON"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "debug",
-            "configurePreset": "debug",
+            "name": "debug-single",
+            "configurePreset": "debug-single",
             "configuration": "Debug",
             "targets": ["install"]
         },
         {
-            "name": "release",
-            "configurePreset": "release",
+            "name": "release-single",
+            "configurePreset": "release-single",
+            "configuration": "Release",
+            "targets": ["install"]
+        },
+        {
+            "name": "debug-multi",
+            "configurePreset": "debug-multi",
+            "configuration": "Debug",
+            "targets": ["install"]
+        },
+        {
+            "name": "release-multi",
+            "configurePreset": "release-multi",
             "configuration": "Release",
             "targets": ["install"]
         }

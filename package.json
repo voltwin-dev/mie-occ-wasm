@@ -3,8 +3,11 @@
     "version": "0.0.0",
     "scripts": {
         "setup": "ts-node setup.ts",
-        "build": "cmake --preset release && cmake --build --preset release",
-        "build:debug": "cmake --preset debug && cmake --build --preset debug"
+        "build:release:single": "cmake --preset release-single && cmake --build --preset release-single",
+        "build:debug:single": "cmake --preset debug-single && cmake --build --preset debug-single",
+        "build:release:multi": "cmake --preset release-multi && cmake --build --preset release-multi",
+        "build:debug:multi": "cmake --preset debug-multi && cmake --build --preset debug-multi",
+        "build": "npm run build:release:single && npm run build:debug:single && npm run build:release:multi && npm run build:debug:multi"
     },
     "license": "LGPL-2.1-only",
     "devDependencies": {

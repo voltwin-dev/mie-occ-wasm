@@ -7,13 +7,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(TARGET mie-occ-wasm)
 set(CMAKE_CONFIGURATION_TYPES Debug;Release)
 set(CMAKE_NINJA_FORCE_RESPONSE_FILE 1 CACHE INTERNAL "")
+
 cmake_path(SET OCCT_PATH ${CMAKE_SOURCE_DIR}/build/occt)
+
+option(MIE_ENABLE_MULTITHREAD "Enable multithreading support" OFF)
+
+set(MIE_INSTALL_PROFILENAME)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    cmake_path(SET CMAKE_INSTALL_PREFIX NORMALIZE ${CMAKE_SOURCE_DIR}/../src/occ_wasm/release)
+    string(APPEND MIE_INSTALL_PROFILENAME "release")
 else()
-    cmake_path(SET CMAKE_INSTALL_PREFIX NORMALIZE ${CMAKE_SOURCE_DIR}/../src/occ_wasm/debug)
+    string(APPEND MIE_INSTALL_PROFILENAME "debug")
+endif()
+if (MIE_ENABLE_MULTITHREAD)
+    string(APPEND MIE_INSTALL_PROFILENAME "-multi")
+else()
+    string(APPEND MIE_INSTALL_PROFILENAME "-single")
 endif()
 
+cmake_path(SET CMAKE_INSTALL_PREFIX NORMALIZE ${CMAKE_SOURCE_DIR}/../src/occ_wasm/${MIE_INSTALL_PROFILENAME})
 cmake_path(RELATIVE_PATH OCCT_PATH BASE_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 set(MIE_OCCT_TOOLKITS
@@ -85,25 +96,30 @@ source_group("Sources" FILES ${MIE_BINDING_SOURCES})
 source_group("OCCT" FILES ${MIE_OCCT_SOURCE_FILES})
 
 if(EMSCRIPTEN)
-    set(SHARED_COMPILE_FLAGS)
-    list(APPEND SHARED_COMPILE_FLAGS
+    set(MIE_SHARED_COMPILE_FLAGS)
+    list(APPEND MIE_SHARED_COMPILE_FLAGS
         -O3
         -flto
     )
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
-        list(APPEND SHARED_COMPILE_FLAGS
+        list(APPEND MIE_SHARED_COMPILE_FLAGS
             -sDISABLE_EXCEPTION_CATCHING=1
         )
     else()
-        list(APPEND SHARED_COMPILE_FLAGS
+        list(APPEND MIE_SHARED_COMPILE_FLAGS
             -sDISABLE_EXCEPTION_CATCHING=0
+        )
+    endif()
+    if (MIE_ENABLE_MULTITHREAD)
+        list(APPEND MIE_SHARED_COMPILE_FLAGS
+            -pthread
         )
     endif()
 
     add_library(occt STATIC ${MIE_OCCT_SOURCE_FILES})
     target_include_directories(occt PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
     target_compile_options(occt PRIVATE
-        ${SHARED_COMPILE_FLAGS}
+        ${MIE_SHARED_COMPILE_FLAGS}
         -Wno-character-conversion
         -Wno-deprecated-pragma
         -Wno-deprecated-declarations
@@ -113,22 +129,26 @@ if(EMSCRIPTEN)
     add_executable(${TARGET} ${MIE_BINDING_SOURCES})
     target_include_directories(${TARGET} PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
     target_compile_options(${TARGET} PRIVATE
-        ${SHARED_COMPILE_FLAGS}
+        ${MIE_SHARED_COMPILE_FLAGS}
         -Wno-deprecated-declarations
     )
     target_link_libraries(${TARGET} PRIVATE occt)
     target_link_options(${TARGET} PRIVATE
-        ${SHARED_COMPILE_FLAGS}
+        ${MIE_SHARED_COMPILE_FLAGS}
         -sMODULARIZE=1
         -sEXPORT_ES6=1
         -sSTACK_SIZE=8MB
-        -sINITIAL_HEAP=64MB
         -sMAXIMUM_MEMORY=4GB
         -sALLOW_MEMORY_GROWTH=1
         -sENVIRONMENT=web
         --bind
         --emit-tsd "${TARGET}.d.ts"
     )
+    if (NOT MIE_ENABLE_MULTITHREAD)
+        target_link_options(${TARGET} PRIVATE
+            -sINITIAL_HEAP=64MB
+        )
+    endif()
 
     install(TARGETS ${TARGET} DESTINATION ${CMAKE_INSTALL_PREFIX})
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.wasm DESTINATION ${CMAKE_INSTALL_PREFIX})

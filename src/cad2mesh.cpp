@@ -184,9 +184,14 @@ private:
             } else {
                 std::cout << "Leaf shape type: " << shape.ShapeType() << std::endl;
                 
-
                 constexpr double ANGLE_DEFLECTION = 0.2;
-                BRepMesh_IncrementalMesh mesh(shape, 0.002, true, ANGLE_DEFLECTION, true);
+                BRepMesh_IncrementalMesh mesh(
+                    shape, // The shape to mesh
+                    0.002, // Linear deflection
+                    true,  // Relative
+                    ANGLE_DEFLECTION, // Angular deflection
+                    true   // In parallel
+                );
 
                 TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
                 for (; faceExplorer.More(); faceExplorer.Next()) {
