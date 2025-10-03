@@ -9,6 +9,7 @@
 
 #include <emscripten/val.h>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -20,12 +21,12 @@
 
 #include "common.hpp"
 
-EMSCRIPTEN_DECLARE_VAL_TYPE(FaceGeometryArray);
-EMSCRIPTEN_DECLARE_VAL_TYPE(EdgeGeometryArray);
+EMSCRIPTEN_DECLARE_VAL_TYPE(TriGeometryArray);
+EMSCRIPTEN_DECLARE_VAL_TYPE(LineGeometryArray);
 EMSCRIPTEN_DECLARE_VAL_TYPE(MaterialArray);
 EMSCRIPTEN_DECLARE_VAL_TYPE(MeshArray);
 
-class FaceGeometry {
+class TriGeometry {
 private:
     std::string name;
     std::vector<float> positions;
@@ -35,7 +36,7 @@ private:
     std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount, indicesStart, indicesCount
 
 public:
-    FaceGeometry(
+    TriGeometry(
         std::string name,
         std::vector<float> positions,
         std::vector<float> normals,
@@ -65,7 +66,7 @@ public:
     Uint32Array getSubmeshIndices() const;
 };
 
-class EdgeGeometry {
+class LineGeometry {
 private:
     std::string name;
     std::vector<float> positions;
@@ -73,7 +74,7 @@ private:
     std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount, indicesStart, indicesCount
 
 public:
-    EdgeGeometry(
+    LineGeometry(
         std::string name,
         std::vector<float> positions,
         std::vector<uint32_t> indices,
@@ -104,8 +105,11 @@ public:
 };
 
 enum class MeshPrimitiveType {
-    Face,
-    Edge
+    Shell, // represented as tri
+    Solid, // represented as tri
+    Edge,  // represented as line
+    Compound, // no geometry, only children
+    Compsolid // no geometry, only children
 };
 
 class Mesh {
@@ -115,6 +119,7 @@ private:
     MeshPrimitiveType primitiveType;
     size_t primitiveIndex;
     size_t materialIndex;
+    size_t parentMeshIndex;
 
 public:
     const std::string& getName() const;
@@ -127,34 +132,34 @@ public:
 class TriangulatedModel {
 private:
     std::string name;
-    std::vector<FaceGeometry> faces;
-    std::vector<EdgeGeometry> edges;
+    std::vector<TriGeometry> tris;
+    std::vector<LineGeometry> lines;
     std::vector<Material> materials;
     std::vector<Mesh> meshes;
     
 public:
     TriangulatedModel(
         std::string name, 
-        std::vector<FaceGeometry> faces,
-        std::vector<EdgeGeometry> edges,
+        std::vector<TriGeometry> tris,
+        std::vector<LineGeometry> lines,
         std::vector<Material> materials,
         std::vector<Mesh> meshes
     )
         : name(std::move(name))
-        , faces(std::move(faces))
-        , edges(std::move(edges))
+        , tris(std::move(tris))
+        , lines(std::move(lines))
         , materials(std::move(materials))
         , meshes(std::move(meshes))
     {
-        faces.shrink_to_fit();
-        edges.shrink_to_fit();
+        tris.shrink_to_fit();
+        lines.shrink_to_fit();
         materials.shrink_to_fit();
         meshes.shrink_to_fit();
     }
 
     const std::string& getName() const;
-    FaceGeometryArray getFaces() const;
-    EdgeGeometryArray getEdges() const;
+    TriGeometryArray getTris() const;
+    LineGeometryArray getLines() const;
     MaterialArray getMaterials() const;
     MeshArray getMeshes() const;
 };

@@ -9,54 +9,58 @@
 
 #include <emscripten/bind.h>
 
-// FaceGeometry methods
+#include <utility>
 
-const std::string& FaceGeometry::getName() const {
+#include "model_triangulation_impl.hpp"
+
+// TriGeometry methods
+
+const std::string& TriGeometry::getName() const {
     return name;
 }
 
-Float32Array FaceGeometry::getPositions() const {
+Float32Array TriGeometry::getPositions() const {
     emscripten::memory_view view(positions.size(), reinterpret_cast<const float*>(positions.data()));
     return Float32Array(emscripten::val(view));
 }
 
-Float32Array FaceGeometry::getNormals() const {
+Float32Array TriGeometry::getNormals() const {
     emscripten::memory_view view(normals.size(), reinterpret_cast<const float*>(normals.data()));
     return Float32Array(emscripten::val(view));
 }
 
-Float32Array FaceGeometry::getUVs() const {
+Float32Array TriGeometry::getUVs() const {
     emscripten::memory_view view(uvs.size(), reinterpret_cast<const float*>(uvs.data()));
     return Float32Array(emscripten::val(view));
 }
 
-Uint32Array FaceGeometry::getIndices() const {
+Uint32Array TriGeometry::getIndices() const {
     emscripten::memory_view view(indices.size(), reinterpret_cast<const uint32_t*>(indices.data()));
     return Uint32Array(emscripten::val(view));
 }
 
-Uint32Array FaceGeometry::getSubmeshIndices() const {
+Uint32Array TriGeometry::getSubmeshIndices() const {
     emscripten::memory_view view(submeshIndices.size(), reinterpret_cast<const uint32_t*>(submeshIndices.data()));
     return Uint32Array(emscripten::val(view));
 }
 
-// EdgeGeometry methods
+// LineGeometry methods
 
-const std::string& EdgeGeometry::getName() const {
+const std::string& LineGeometry::getName() const {
     return name;
 }
 
-Float32Array EdgeGeometry::getPositions() const {
+Float32Array LineGeometry::getPositions() const {
     emscripten::memory_view view(positions.size(), reinterpret_cast<const float*>(positions.data()));
     return Float32Array(emscripten::val(view));
 }
 
-Uint32Array EdgeGeometry::getIndices() const {
+Uint32Array LineGeometry::getIndices() const {
     emscripten::memory_view view(indices.size(), reinterpret_cast<const uint32_t*>(indices.data()));
     return Uint32Array(emscripten::val(view));
 }
 
-Uint32Array EdgeGeometry::getSubmeshIndices() const {
+Uint32Array LineGeometry::getSubmeshIndices() const {
     emscripten::memory_view view(submeshIndices.size(), reinterpret_cast<const uint32_t*>(submeshIndices.data()));
     return Uint32Array(emscripten::val(view));
 }
@@ -103,14 +107,14 @@ const std::string& TriangulatedModel::getName() const {
     return name;
 }
 
-FaceGeometryArray TriangulatedModel::getFaces() const {
-    emscripten::memory_view view(faces.size(), reinterpret_cast<const FaceGeometry*>(faces.data()));
-    return FaceGeometryArray(emscripten::val(view));
+TriGeometryArray TriangulatedModel::getTris() const {
+    emscripten::memory_view view(tris.size(), reinterpret_cast<const TriGeometry*>(tris.data()));
+    return TriGeometryArray(emscripten::val(view));
 }
 
-EdgeGeometryArray TriangulatedModel::getEdges() const {
-    emscripten::memory_view view(edges.size(), reinterpret_cast<const EdgeGeometry*>(edges.data()));
-    return EdgeGeometryArray(emscripten::val(view));
+LineGeometryArray TriangulatedModel::getLines() const {
+    emscripten::memory_view view(lines.size(), reinterpret_cast<const LineGeometry*>(lines.data()));
+    return LineGeometryArray(emscripten::val(view));
 }
 
 MaterialArray TriangulatedModel::getMaterials() const {
@@ -129,34 +133,46 @@ void ModelContext::computeTriangulation() {
     if (triangulatedModel.has_value()) {
         return;
     }
+
+    TCollection_ExtendedString docName = doc->GetName();
+    Standard_Integer length = docName.LengthOfCString();
+    Standard_Character* buffer = new Standard_Character[length + 1];
+    docName.ToUTF8CString(buffer);
+    std::string docNameStr(buffer, length);
+    delete[] buffer;
+
+    triangulatedModel = ModelTriangulationImpl::computeTriangulation(std::move(docNameStr), shapeTool, colorTool);
 }
 
 EMSCRIPTEN_BINDINGS(model_context_module) {
-    emscripten::register_type<FaceGeometryArray>("Array<FaceGeometry>");
-    emscripten::register_type<EdgeGeometryArray>("Array<EdgeGeometry>");
+    emscripten::register_type<TriGeometryArray>("Array<TriGeometry>");
+    emscripten::register_type<LineGeometryArray>("Array<LineGeometry>");
     emscripten::register_type<MaterialArray>("Array<Material>");
     emscripten::register_type<MeshArray>("Array<Mesh>");
 
-    emscripten::class_<FaceGeometry>("FaceGeometry")
-        .function("getName", &FaceGeometry::getName)
-        .function("getPositions", &FaceGeometry::getPositions)
-        .function("getNormals", &FaceGeometry::getNormals)
-        .function("getUVs", &FaceGeometry::getUVs)
-        .function("getIndices", &FaceGeometry::getIndices)
-        .function("getSubmeshIndices", &FaceGeometry::getSubmeshIndices);
+    emscripten::class_<TriGeometry>("TriGeometry")
+        .function("getName", &TriGeometry::getName)
+        .function("getPositions", &TriGeometry::getPositions)
+        .function("getNormals", &TriGeometry::getNormals)
+        .function("getUVs", &TriGeometry::getUVs)
+        .function("getIndices", &TriGeometry::getIndices)
+        .function("getSubmeshIndices", &TriGeometry::getSubmeshIndices);
 
-    emscripten::class_<EdgeGeometry>("EdgeGeometry")
-        .function("getName", &EdgeGeometry::getName)
-        .function("getPositions", &EdgeGeometry::getPositions)
-        .function("getIndices", &EdgeGeometry::getIndices)
-        .function("getSubmeshIndices", &EdgeGeometry::getSubmeshIndices);
+    emscripten::class_<LineGeometry>("LineGeometry")
+        .function("getName", &LineGeometry::getName)
+        .function("getPositions", &LineGeometry::getPositions)
+        .function("getIndices", &LineGeometry::getIndices)
+        .function("getSubmeshIndices", &LineGeometry::getSubmeshIndices);
 
     emscripten::class_<Material>("Material")
         .function("getColor", &Material::getColor);
 
     emscripten::enum_<MeshPrimitiveType>("MeshPrimitiveType")
-        .value("Face", MeshPrimitiveType::Face)
-        .value("Edge", MeshPrimitiveType::Edge);
+        .value("Shell", MeshPrimitiveType::Shell)
+        .value("Solid", MeshPrimitiveType::Solid)
+        .value("Edge", MeshPrimitiveType::Edge)
+        .value("Compound", MeshPrimitiveType::Compound)
+        .value("Compsolid", MeshPrimitiveType::Compsolid);
 
     emscripten::class_<Mesh>("Mesh")
         .function("getName", &Mesh::getName)
@@ -167,8 +183,8 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
 
     emscripten::class_<TriangulatedModel>("TriangulatedModel")
         .function("getName", &TriangulatedModel::getName)
-        .function("getFaces", &TriangulatedModel::getFaces)
-        .function("getEdges", &TriangulatedModel::getEdges)
+        .function("getTris", &TriangulatedModel::getTris)
+        .function("getLines", &TriangulatedModel::getLines)
         .function("getMaterials", &TriangulatedModel::getMaterials)
         .function("getMeshes", &TriangulatedModel::getMeshes);
 
