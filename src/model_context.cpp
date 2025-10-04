@@ -98,10 +98,6 @@ int Mesh::getParentMeshIndex() const {
 
 // TriangulatedModel methods
 
-const std::string& TriangulatedModel::getName() const {
-    return name;
-}
-
 size_t TriangulatedModel::getTriCount() const {
     return tris.size();
 }
@@ -141,14 +137,7 @@ void ModelContext::computeTriangulation() {
         return;
     }
 
-    TCollection_ExtendedString docName = doc->GetName();
-    Standard_Integer length = docName.LengthOfCString();
-    Standard_Character* buffer = new Standard_Character[length + 1];
-    docName.ToUTF8CString(buffer);
-    std::string docNameStr(buffer, length);
-    delete[] buffer;
-
-    triangulatedModel = ModelTriangulationImpl::computeTriangulation(std::move(docNameStr), shapeTool, colorTool);
+    triangulatedModel = ModelTriangulationImpl::computeTriangulation(shapeTool, colorTool);
 }
 
 std::optional<TriangulatedModel>& ModelContext::getTriangulatedModel() {
@@ -188,7 +177,6 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getParentMeshIndex", &Mesh::getParentMeshIndex);
 
     emscripten::class_<TriangulatedModel>("TriangulatedModel")
-        .function("getName", &TriangulatedModel::getName)
         .function("getTriCount", &TriangulatedModel::getTriCount)
         .function("getTri", &TriangulatedModel::getTri, emscripten::return_value_policy::reference())
         .function("getLineCount", &TriangulatedModel::getLineCount)

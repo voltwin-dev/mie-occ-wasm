@@ -77,7 +77,7 @@ public:
         , colorTool(colorTool)
     { }
 
-    TriangulatedModel compute(const std::string& modelName) {
+    TriangulatedModel compute() {
         // build solid and edge shape ID maps
         for (TDF_ChildIterator it(shapeTool->Label()); it.More(); it.Next()) {
             TDF_Label childLabel = it.Value();
@@ -110,7 +110,6 @@ public:
         }
 
         return TriangulatedModel(
-            std::move(modelName),
             std::move(tris),
             std::move(lines),
             std::move(materials),
@@ -283,7 +282,7 @@ private:
             std::vector<float> positions;
             std::vector<uint32_t> submeshIndices;
 
-            TopExp_Explorer edgeExplorer(shape, TopAbs_EDGE, TopAbs_FACE);
+            TopExp_Explorer edgeExplorer(shape, TopAbs_EDGE);
             for (; edgeExplorer.More(); edgeExplorer.Next()) {
                 TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
 
@@ -404,10 +403,9 @@ private:
 };
 
 TriangulatedModel ModelTriangulationImpl::computeTriangulation(
-    std::string modelName,
     Handle(XCAFDoc_ShapeTool)& shapeTool,
     Handle(XCAFDoc_ColorTool)& colorTool
 ) {
     TriangulationContext context(shapeTool, colorTool);
-    return context.compute(std::move(modelName));
+    return context.compute();
 }

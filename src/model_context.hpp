@@ -142,7 +142,6 @@ public:
 
 class TriangulatedModel {
 private:
-    std::string name;
     std::vector<TriGeometry> tris;
     std::vector<LineGeometry> lines;
     std::vector<Material> materials;
@@ -150,14 +149,12 @@ private:
     
 public:
     TriangulatedModel(
-        std::string name, 
         std::vector<TriGeometry> tris,
         std::vector<LineGeometry> lines,
         std::vector<Material> materials,
         std::vector<Mesh> meshes
     )
-        : name(std::move(name))
-        , tris(std::move(tris))
+        : tris(std::move(tris))
         , lines(std::move(lines))
         , materials(std::move(materials))
         , meshes(std::move(meshes))
@@ -168,7 +165,6 @@ public:
         meshes.shrink_to_fit();
     }
 
-    const std::string& getName() const;
     size_t getTriCount() const;
     TriGeometry& getTri(size_t index);
     size_t getLineCount() const;

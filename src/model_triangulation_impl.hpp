@@ -17,7 +17,6 @@
 class ModelTriangulationImpl {
 public:
     static TriangulatedModel computeTriangulation(
-        std::string modelName,
         Handle(XCAFDoc_ShapeTool)& shapeTool,
         Handle(XCAFDoc_ColorTool)& colorTool
     );
