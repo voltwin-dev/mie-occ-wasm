@@ -7,6 +7,7 @@
 
 #include "model_triangulation_impl.hpp"
 
+#include <array>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -342,6 +343,15 @@ private:
 
             Standard_Integer meshIndex = static_cast<Standard_Integer>(meshes.size());
             gp_Trsf shapeTransform = shape.Location().Transformation();
+            std::array<float, 16> matrixArray;
+            for (int row = 1; row <= 3; ++row) for (int col = 1; col <= 4; ++col) {
+                matrixArray[(row - 1) * 4 + (col - 1)] = static_cast<float>(shapeTransform.Value(row, col));
+            }
+            matrixArray[12] = 0.0f;
+            matrixArray[13] = 0.0f;
+            matrixArray[14] = 0.0f;
+            matrixArray[15] = 1.0f;
+
             MeshPrimitiveType primitiveType;
             switch (shape.ShapeType()) {
             case TopAbs_COMPOUND: primitiveType = MeshPrimitiveType::Compound; break;
@@ -391,7 +401,7 @@ private:
 
             meshes.push_back(Mesh(
                 std::move(shapeName),
-                shapeTransform,
+                matrixArray,
                 primitiveType,
                 triGeometryIndex,
                 lineGeometryIndex,

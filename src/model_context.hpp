@@ -105,7 +105,7 @@ enum class MeshPrimitiveType {
 class Mesh {
 private:
     std::string name;
-    gp_Trsf transform;
+    std::array<float, 16> transform;
     MeshPrimitiveType primitiveType;
     int triGeometryIndex;
     int lineGeometryIndex;
@@ -115,7 +115,7 @@ private:
 public:
     Mesh(
         std::string name,
-        const gp_Trsf& transform,
+        const std::array<float, 16>& transform,
         MeshPrimitiveType primitiveType,
         int triGeometryIndex,
         int lineGeometryIndex,

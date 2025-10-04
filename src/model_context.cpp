@@ -66,13 +66,7 @@ const std::string& Mesh::getName() const {
 }
 
 Float32Array Mesh::getTransform() const {
-    std::array<float, 16> matrixArray;
-    for (int row = 1; row <= 4; ++row) {
-        for (int col = 1; col <= 4; ++col) {
-            matrixArray[(row - 1) * 4 + (col - 1)] = static_cast<float>(transform.Value(row, col));
-        }
-    }
-    emscripten::memory_view view(16, reinterpret_cast<const float*>(matrixArray.data()));
+    emscripten::memory_view view(16, reinterpret_cast<const float*>(transform.data()));
     return Float32Array(emscripten::val(view));
 }
 
