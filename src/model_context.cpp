@@ -15,10 +15,6 @@
 
 // TriGeometry methods
 
-const std::string& TriGeometry::getName() const {
-    return name;
-}
-
 Float32Array TriGeometry::getPositions() const {
     emscripten::memory_view view(positions.size(), reinterpret_cast<const float*>(positions.data()));
     return Float32Array(emscripten::val(view));
@@ -46,18 +42,9 @@ Uint32Array TriGeometry::getSubmeshIndices() const {
 
 // LineGeometry methods
 
-const std::string& LineGeometry::getName() const {
-    return name;
-}
-
 Float32Array LineGeometry::getPositions() const {
     emscripten::memory_view view(positions.size(), reinterpret_cast<const float*>(positions.data()));
     return Float32Array(emscripten::val(view));
-}
-
-Uint32Array LineGeometry::getIndices() const {
-    emscripten::memory_view view(indices.size(), reinterpret_cast<const uint32_t*>(indices.data()));
-    return Uint32Array(emscripten::val(view));
 }
 
 Uint32Array LineGeometry::getSubmeshIndices() const {
@@ -93,12 +80,20 @@ MeshPrimitiveType Mesh::getPrimitiveType() const {
     return primitiveType;
 }
 
-size_t Mesh::getPrimitiveIndex() const {
-    return primitiveIndex;
+int Mesh::getTriGeometryIndex() const {
+    return triGeometryIndex;
 }
 
-size_t Mesh::getMaterialIndex() const {
+int Mesh::getLineGeometryIndex() const {
+    return lineGeometryIndex;
+}
+
+int Mesh::getMaterialIndex() const {
     return materialIndex;
+}
+
+int Mesh::getParentMeshIndex() const {
+    return parentMeshIndex;
 }
 
 // TriangulatedModel methods
@@ -151,7 +146,6 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
     emscripten::register_type<MeshArray>("Array<Mesh>");
 
     emscripten::class_<TriGeometry>("TriGeometry")
-        .function("getName", &TriGeometry::getName)
         .function("getPositions", &TriGeometry::getPositions)
         .function("getNormals", &TriGeometry::getNormals)
         .function("getUVs", &TriGeometry::getUVs)
@@ -159,9 +153,7 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getSubmeshIndices", &TriGeometry::getSubmeshIndices);
 
     emscripten::class_<LineGeometry>("LineGeometry")
-        .function("getName", &LineGeometry::getName)
         .function("getPositions", &LineGeometry::getPositions)
-        .function("getIndices", &LineGeometry::getIndices)
         .function("getSubmeshIndices", &LineGeometry::getSubmeshIndices);
 
     emscripten::class_<Material>("Material")
@@ -172,14 +164,17 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .value("Solid", MeshPrimitiveType::Solid)
         .value("Edge", MeshPrimitiveType::Edge)
         .value("Compound", MeshPrimitiveType::Compound)
-        .value("Compsolid", MeshPrimitiveType::Compsolid);
+        .value("Compsolid", MeshPrimitiveType::Compsolid)
+        .value("Unknown", MeshPrimitiveType::Unknown);
 
     emscripten::class_<Mesh>("Mesh")
         .function("getName", &Mesh::getName)
         .function("getTransform", &Mesh::getTransform)
         .function("getPrimitiveType", &Mesh::getPrimitiveType)
-        .function("getPrimitiveIndex", &Mesh::getPrimitiveIndex)
-        .function("getMaterialIndex", &Mesh::getMaterialIndex);
+        .function("getTriGeometryIndex", &Mesh::getTriGeometryIndex)
+        .function("getLineGeometryIndex", &Mesh::getLineGeometryIndex)
+        .function("getMaterialIndex", &Mesh::getMaterialIndex)
+        .function("getParentMeshIndex", &Mesh::getParentMeshIndex);
 
     emscripten::class_<TriangulatedModel>("TriangulatedModel")
         .function("getName", &TriangulatedModel::getName)

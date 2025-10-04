@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <optional>
 #include <string>
 
 #include <XCAFDoc_ShapeTool.hxx>
@@ -17,7 +16,7 @@
 
 class ModelTriangulationImpl {
 public:
-    static std::optional<TriangulatedModel> computeTriangulation(
+    static TriangulatedModel computeTriangulation(
         std::string modelName,
         Handle(XCAFDoc_ShapeTool)& shapeTool,
         Handle(XCAFDoc_ColorTool)& colorTool

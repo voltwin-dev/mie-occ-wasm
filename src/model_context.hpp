@@ -28,7 +28,6 @@ EMSCRIPTEN_DECLARE_VAL_TYPE(MeshArray);
 
 class TriGeometry {
 private:
-    std::string name;
     std::vector<float> positions;
     std::vector<float> normals;
     std::vector<float> uvs;
@@ -36,16 +35,15 @@ private:
     std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount, indicesStart, indicesCount
 
 public:
+    TriGeometry() = default;
     TriGeometry(
-        std::string name,
         std::vector<float> positions,
         std::vector<float> normals,
         std::vector<float> uvs,
         std::vector<uint32_t> indices,
         std::vector<uint32_t> submeshIndices
     )
-        : name(std::move(name))
-        , positions(std::move(positions))
+        : positions(std::move(positions))
         , normals(std::move(normals))
         , uvs(std::move(uvs))
         , indices(std::move(indices))
@@ -58,7 +56,6 @@ public:
         submeshIndices.shrink_to_fit();
     }
 
-    const std::string& getName() const;
     Float32Array getPositions() const;
     Float32Array getNormals() const;
     Float32Array getUVs() const;
@@ -68,31 +65,23 @@ public:
 
 class LineGeometry {
 private:
-    std::string name;
     std::vector<float> positions;
-    std::vector<uint32_t> indices; // line segments
-    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount, indicesStart, indicesCount
+    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount
 
 public:
+    LineGeometry() = default;
     LineGeometry(
-        std::string name,
         std::vector<float> positions,
-        std::vector<uint32_t> indices,
         std::vector<uint32_t> submeshIndices
     )
-        : name(std::move(name))
-        , positions(std::move(positions))
-        , indices(std::move(indices))
+        : positions(std::move(positions))
         , submeshIndices(std::move(submeshIndices))
     {
         positions.shrink_to_fit();
-        indices.shrink_to_fit();
         submeshIndices.shrink_to_fit();
     }
 
-    const std::string& getName() const;
     Float32Array getPositions() const;
-    Uint32Array getIndices() const;
     Uint32Array getSubmeshIndices() const;
 };
 
@@ -101,15 +90,21 @@ private:
     std::array<float, 3> color; // RGB
 
 public:
+    Material() = default;
+    Material(std::array<float, 3> color)
+        : color(color)
+    {
+    }
     Float32Array getColor() const;
 };
 
 enum class MeshPrimitiveType {
-    Shell, // represented as tri
-    Solid, // represented as tri
+    Shell, // represented as tri and line
+    Solid, // represented as tri and line
     Edge,  // represented as line
     Compound, // no geometry, only children
-    Compsolid // no geometry, only children
+    Compsolid, // no geometry, only children
+    Unknown // no geometry, only children
 };
 
 class Mesh {
@@ -117,16 +112,37 @@ private:
     std::string name;
     gp_Trsf transform;
     MeshPrimitiveType primitiveType;
-    size_t primitiveIndex;
-    size_t materialIndex;
-    size_t parentMeshIndex;
+    int triGeometryIndex;
+    int lineGeometryIndex;
+    int materialIndex;
+    int parentMeshIndex;
 
 public:
+    Mesh(
+        std::string name,
+        const gp_Trsf& transform,
+        MeshPrimitiveType primitiveType,
+        int triGeometryIndex,
+        int lineGeometryIndex,
+        int materialIndex,
+        int parentMeshIndex
+    )
+        : name(std::move(name))
+        , transform(transform)
+        , primitiveType(primitiveType)
+        , triGeometryIndex(triGeometryIndex)
+        , lineGeometryIndex(lineGeometryIndex)
+        , materialIndex(materialIndex)
+        , parentMeshIndex(parentMeshIndex)
+    {
+    }
     const std::string& getName() const;
     Float32Array getTransform() const;
     MeshPrimitiveType getPrimitiveType() const;
-    size_t getPrimitiveIndex() const;
-    size_t getMaterialIndex() const;
+    int getTriGeometryIndex() const;
+    int getLineGeometryIndex() const;
+    int getMaterialIndex() const;
+    int getParentMeshIndex() const;
 };
 
 class TriangulatedModel {
