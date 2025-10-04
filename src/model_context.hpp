@@ -21,11 +21,6 @@
 
 #include "common.hpp"
 
-EMSCRIPTEN_DECLARE_VAL_TYPE(TriGeometryArray);
-EMSCRIPTEN_DECLARE_VAL_TYPE(LineGeometryArray);
-EMSCRIPTEN_DECLARE_VAL_TYPE(MaterialArray);
-EMSCRIPTEN_DECLARE_VAL_TYPE(MeshArray);
-
 class TriGeometry {
 private:
     std::vector<float> positions;
@@ -174,10 +169,14 @@ public:
     }
 
     const std::string& getName() const;
-    TriGeometryArray getTris() const;
-    LineGeometryArray getLines() const;
-    MaterialArray getMaterials() const;
-    MeshArray getMeshes() const;
+    size_t getTriCount() const;
+    TriGeometry& getTri(size_t index);
+    size_t getLineCount() const;
+    LineGeometry& getLine(size_t index);
+    size_t getMaterialCount() const;
+    Material& getMaterial(size_t index);
+    size_t getMeshCount() const;
+    Mesh& getMesh(size_t index);
 };
 
 class ModelContext {
@@ -197,8 +196,5 @@ public:
     }
 
     void computeTriangulation();
-
-    const std::optional<TriangulatedModel>& getTriangulatedModel() const {
-        return triangulatedModel;
-    }
+    std::optional<TriangulatedModel>& getTriangulatedModel();
 };

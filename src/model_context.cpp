@@ -102,24 +102,36 @@ const std::string& TriangulatedModel::getName() const {
     return name;
 }
 
-TriGeometryArray TriangulatedModel::getTris() const {
-    emscripten::memory_view view(tris.size(), reinterpret_cast<const TriGeometry*>(tris.data()));
-    return TriGeometryArray(emscripten::val(view));
+size_t TriangulatedModel::getTriCount() const {
+    return tris.size();
 }
 
-LineGeometryArray TriangulatedModel::getLines() const {
-    emscripten::memory_view view(lines.size(), reinterpret_cast<const LineGeometry*>(lines.data()));
-    return LineGeometryArray(emscripten::val(view));
+TriGeometry& TriangulatedModel::getTri(size_t index) {
+    return tris[index];
 }
 
-MaterialArray TriangulatedModel::getMaterials() const {
-    emscripten::memory_view view(materials.size(), reinterpret_cast<const Material*>(materials.data()));
-    return MaterialArray(emscripten::val(view));
+size_t TriangulatedModel::getLineCount() const {
+    return lines.size();
 }
 
-MeshArray TriangulatedModel::getMeshes() const {
-    emscripten::memory_view view(meshes.size(), reinterpret_cast<const Mesh*>(meshes.data()));
-    return MeshArray(emscripten::val(view));
+LineGeometry& TriangulatedModel::getLine(size_t index) {
+    return lines[index];
+}
+
+size_t TriangulatedModel::getMaterialCount() const {
+    return materials.size();
+}
+
+Material& TriangulatedModel::getMaterial(size_t index) {
+    return materials[index];
+}
+
+size_t TriangulatedModel::getMeshCount() const {
+    return meshes.size();
+}
+
+Mesh& TriangulatedModel::getMesh(size_t index) {
+    return meshes[index];
 }
 
 // ModelContext methods
@@ -139,12 +151,11 @@ void ModelContext::computeTriangulation() {
     triangulatedModel = ModelTriangulationImpl::computeTriangulation(std::move(docNameStr), shapeTool, colorTool);
 }
 
-EMSCRIPTEN_BINDINGS(model_context_module) {
-    emscripten::register_type<TriGeometryArray>("Array<TriGeometry>");
-    emscripten::register_type<LineGeometryArray>("Array<LineGeometry>");
-    emscripten::register_type<MaterialArray>("Array<Material>");
-    emscripten::register_type<MeshArray>("Array<Mesh>");
+std::optional<TriangulatedModel>& ModelContext::getTriangulatedModel() {
+    return triangulatedModel;
+}
 
+EMSCRIPTEN_BINDINGS(model_context_module) {
     emscripten::class_<TriGeometry>("TriGeometry")
         .function("getPositions", &TriGeometry::getPositions)
         .function("getNormals", &TriGeometry::getNormals)
@@ -178,16 +189,20 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
 
     emscripten::class_<TriangulatedModel>("TriangulatedModel")
         .function("getName", &TriangulatedModel::getName)
-        .function("getTris", &TriangulatedModel::getTris)
-        .function("getLines", &TriangulatedModel::getLines)
-        .function("getMaterials", &TriangulatedModel::getMaterials)
-        .function("getMeshes", &TriangulatedModel::getMeshes);
+        .function("getTriCount", &TriangulatedModel::getTriCount)
+        .function("getTri", &TriangulatedModel::getTri, emscripten::return_value_policy::reference())
+        .function("getLineCount", &TriangulatedModel::getLineCount)
+        .function("getLine", &TriangulatedModel::getLine, emscripten::return_value_policy::reference())
+        .function("getMaterialCount", &TriangulatedModel::getMaterialCount)
+        .function("getMaterial", &TriangulatedModel::getMaterial, emscripten::return_value_policy::reference())
+        .function("getMeshCount", &TriangulatedModel::getMeshCount)
+        .function("getMesh", &TriangulatedModel::getMesh, emscripten::return_value_policy::reference());
 
     emscripten::register_optional<TriangulatedModel>();
 
     emscripten::class_<ModelContext>("ModelContext")
         .function("computeTriangulation", &ModelContext::computeTriangulation)
-        .function("getTriangulatedModel", &ModelContext::getTriangulatedModel);
+        .function("getTriangulatedModel", &ModelContext::getTriangulatedModel, emscripten::return_value_policy::reference());
 
     emscripten::register_optional<ModelContext>();
 }

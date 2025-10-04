@@ -61,5 +61,5 @@ public:
 
 EMSCRIPTEN_BINDINGS(model_context) {
     emscripten::class_<CadImport>("CadImport")
-        .class_function("fromStep", &CadImport::fromStep);
+        .class_function("fromStep", &CadImport::fromStep, emscripten::return_value_policy::take_ownership());
 }

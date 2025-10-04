@@ -110,7 +110,7 @@ public:
         }
 
         return TriangulatedModel(
-            modelName,
+            std::move(modelName),
             std::move(tris),
             std::move(lines),
             std::move(materials),
@@ -409,5 +409,5 @@ TriangulatedModel ModelTriangulationImpl::computeTriangulation(
     Handle(XCAFDoc_ColorTool)& colorTool
 ) {
     TriangulationContext context(shapeTool, colorTool);
-    return context.compute(modelName);
+    return context.compute(std::move(modelName));
 }
