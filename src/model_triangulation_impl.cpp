@@ -333,19 +333,22 @@ private:
         struct StackFrame {
             TopoDS_Shape shape;
             Standard_Integer parentMeshIndex;
+            gp_Trsf parentWorldTransform;
         };
         std::vector<StackFrame> stack;
-        stack.push_back({ rootShape, -1 });
+        stack.push_back({ rootShape, -1, gp_Trsf() });
 
         while (!stack.empty()) {
-            auto [shape, parentMeshIndex] = stack.back();
+            auto [shape, parentMeshIndex, parentWorldTransform] = stack.back();
             stack.pop_back();
 
             Standard_Integer meshIndex = static_cast<Standard_Integer>(meshes.size());
             gp_Trsf shapeTransform = shape.Location().Transformation();
+            
+            gp_Trsf relativeTransform = parentWorldTransform.Inverted().Multiplied(shapeTransform);
             std::array<float, 16> matrixArray;
             for (int row = 1; row <= 3; ++row) for (int col = 1; col <= 4; ++col) {
-                matrixArray[(row - 1) * 4 + (col - 1)] = static_cast<float>(shapeTransform.Value(row, col));
+                matrixArray[(row - 1) * 4 + (col - 1)] = static_cast<float>(relativeTransform.Value(row, col));
             }
             matrixArray[12] = 0.0f;
             matrixArray[13] = 0.0f;
@@ -391,7 +394,7 @@ private:
                 // resolve sub-shapes if compound shape
                 TopoDS_Iterator it(shape);
                 for (; it.More(); it.Next()) {
-                    stack.push_back({ it.Value(), meshIndex });
+                    stack.push_back({ it.Value(), meshIndex, shapeTransform });
                 }
             } else if (shape.ShapeType() == TopAbs_SOLID || shape.ShapeType() == TopAbs_SHELL) {
                 ProcessedShapeInfo processedInfo = triangulateShape(shape);
