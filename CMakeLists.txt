@@ -98,6 +98,7 @@ source_group("OCCT" FILES ${MIE_OCCT_SOURCE_FILES})
 if(EMSCRIPTEN)
     set(MIE_SHARED_COMPILE_FLAGS)
     list(APPEND MIE_SHARED_COMPILE_FLAGS
+        --cache sccache
         -O3
         -flto
     )
@@ -116,29 +117,15 @@ if(EMSCRIPTEN)
         )
     endif()
 
-    set(MIE_OCCT_LIB_PATH ${CMAKE_CURRENT_BINARY_DIR}/libocct.a)
-    set(MIE_OCCT_LIB_CACHE_MARKER ${CMAKE_CURRENT_BINARY_DIR}/libocct.marker)
-
-    message(STATUS "MIE_OCCT_LIB_PATH: ${MIE_OCCT_LIB_PATH}")
-    message(STATUS "MIE_OCCT_LIB_CACHE_MARKER: ${MIE_OCCT_LIB_CACHE_MARKER}")
-        
-    if(NOT EXISTS ${MIE_OCCT_LIB_CACHE_MARKER})
-        add_library(occt STATIC ${MIE_OCCT_SOURCE_FILES})
-        target_include_directories(occt PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
-        target_compile_options(occt PRIVATE
-            ${MIE_SHARED_COMPILE_FLAGS}
-            -Wno-character-conversion
-            -Wno-deprecated-pragma
-            -Wno-deprecated-declarations
-            -DOCCT_NO_PLUGINS
-        )
-        add_custom_command(TARGET occt POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E touch "${MIE_OCCT_LIB_CACHE_MARKER}"
-        )
-    else()
-        add_library(occt STATIC IMPORTED)
-        set_target_properties(occt PROPERTIES IMPORTED_LOCATION ${MIE_OCCT_LIB_PATH})
-    endif()
+    add_library(occt STATIC ${MIE_OCCT_SOURCE_FILES})
+    target_include_directories(occt PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
+    target_compile_options(occt PRIVATE
+        ${MIE_SHARED_COMPILE_FLAGS}
+        -Wno-character-conversion
+        -Wno-deprecated-pragma
+        -Wno-deprecated-declarations
+        -DOCCT_NO_PLUGINS
+    )
 
     add_executable(${TARGET} ${MIE_BINDING_SOURCES})
     target_include_directories(${TARGET} PRIVATE ${MIE_OCCT_TOOLKIT_INCLUDE_FOLDERS})
