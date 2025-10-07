@@ -247,8 +247,8 @@ private:
                             polyTri->Triangle(i).Get(n1, n2, n3);
                             // convert to zero-based index
                             indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
                             indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
+                            indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
                         }
                     } else {
                         for (Standard_Integer i = 1; i <= polyTri->NbTriangles(); ++i) {
@@ -256,8 +256,8 @@ private:
                             polyTri->Triangle(i).Get(n1, n2, n3);
                             // convert to zero-based index
                             indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
                             indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
+                            indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
                         }
                     }
                 }
@@ -347,12 +347,14 @@ private:
             
             gp_Trsf relativeTransform = parentWorldTransform.Inverted().Multiplied(shapeTransform);
             std::array<float, 16> matrixArray;
-            for (int row = 1; row <= 3; ++row) for (int col = 1; col <= 4; ++col) {
-                matrixArray[(row - 1) * 4 + (col - 1)] = static_cast<float>(relativeTransform.Value(row, col));
+            for (int row = 1; row < 4; row++) {
+                for (int col = 1; col <= 4; col++) {
+                    matrixArray[(col - 1) * 4 + (row - 1)] = static_cast<float>(relativeTransform.Value(row, col));
+                }
             }
-            matrixArray[12] = 0.0f;
-            matrixArray[13] = 0.0f;
-            matrixArray[14] = 0.0f;
+            matrixArray[3] = 0.0f;
+            matrixArray[7] = 0.0f;
+            matrixArray[11] = 0.0f;
             matrixArray[15] = 1.0f;
 
             MeshPrimitiveType primitiveType;
