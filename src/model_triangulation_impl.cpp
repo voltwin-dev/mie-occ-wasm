@@ -9,6 +9,7 @@
 
 #include <array>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -23,8 +24,10 @@
 #include <gp_Trsf.hxx>
 #include <gp_Pnt.hxx>
 #include <Poly_Triangulation.hxx>
+#include <Poly_PolygonOnTriangulation.hxx>
 #include <Prs3d.hxx>
 #include <Quantity_Color.hxx>
+#include <TColStd_Array1OfInteger.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDF_ChildIterator.hxx>
 #include <TDF_Label.hxx>
@@ -70,6 +73,8 @@ private:
 
     // for triangulation processing
     std::unordered_map<TopoDS_TShape*, ProcessedShapeInfo> processedShapeMap;
+    // for remove edge duplication
+    std::unordered_set<TopoDS_TShape*> processedEdgeSet;
 public:
     TriangulationContext(
         Handle(XCAFDoc_ShapeTool) shapeTool,
@@ -90,6 +95,7 @@ public:
         }
         
         processedShapeMap.clear();
+        processedEdgeSet.clear();
 
         std::vector<TriGeometry> tris(triGeometryMap.size());
         for (const auto& [_, triInfo] : triGeometryMap) tris[triInfo.id] = std::move(triInfo.geometry);
@@ -180,145 +186,162 @@ private:
             true   // In parallel
         );
 
-        {
-            std::vector<float> positions;
-            std::vector<float> normals;
-            std::vector<float> uvs;
-            std::vector<uint32_t> indices;
-            std::vector<uint32_t> submeshIndices;
+        LineGeometry lineData;
+        TriGeometry triData;
 
-            TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
-            for (; faceExplorer.More(); faceExplorer.Next()) {
-                const TopoDS_Face& face = TopoDS::Face(faceExplorer.Current());
-                
-                TopLoc_Location location;
-                Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(face, location);
+        TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
+        for (; faceExplorer.More(); faceExplorer.Next()) {
+            const TopoDS_Face& face = TopoDS::Face(faceExplorer.Current());
+            
+            TopLoc_Location location;
+            Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(face, location);
 
-                if (!polyTri.IsNull()) {
-                    gp_Trsf childTransform = location.Transformation(); // child global transform
-                    gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
-                    TopAbs_Orientation faceOrientation = face.Orientation();
-                    Standard_Size indexOffset = static_cast<Standard_Size>(positions.size() / 3);
+            if (!polyTri.IsNull()) {
+                gp_Trsf childTransform = location.Transformation(); // child global transform
+                gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
+                TopAbs_Orientation faceOrientation = face.Orientation();
+                Standard_Size indexOffset = static_cast<Standard_Size>(triData.positions.size() / 3);
 
-                    submeshIndices.push_back(static_cast<uint32_t>(indexOffset)); // vertex start
-                    submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbNodes())); // vertex count
-                    submeshIndices.push_back(static_cast<uint32_t>(indices.size())); // index start
-                    submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
+                triData.submeshIndices.push_back(static_cast<uint32_t>(indexOffset)); // vertex start
+                triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbNodes())); // vertex count
+                triData.submeshIndices.push_back(static_cast<uint32_t>(triData.indices.size())); // index start
+                triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
 
+                for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
+                    gp_Pnt pnt = polyTri->Node(i).Transformed(relativeTransform);
+                    triData.positions.push_back(static_cast<float>(pnt.X()));
+                    triData.positions.push_back(static_cast<float>(pnt.Y()));
+                    triData.positions.push_back(static_cast<float>(pnt.Z()));
+                }
+
+                BRepLib_ToolTriangulatedShape::ComputeNormals(face, polyTri);
+                Standard_Boolean fixNormals = (faceOrientation == TopAbs_REVERSED) ^ (relativeTransform.VectorialPart().Determinant() < 0);
+                if (fixNormals) {
                     for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
-                        gp_Pnt pnt = polyTri->Node(i).Transformed(relativeTransform);
-                        positions.push_back(static_cast<float>(pnt.X()));
-                        positions.push_back(static_cast<float>(pnt.Y()));
-                        positions.push_back(static_cast<float>(pnt.Z()));
+                        gp_Dir normal = polyTri->Normal(i).Reversed().Transformed(relativeTransform);
+                        triData.normals.push_back(static_cast<float>(normal.X()));
+                        triData.normals.push_back(static_cast<float>(normal.Y()));
+                        triData.normals.push_back(static_cast<float>(normal.Z()));
                     }
-
-                    BRepLib_ToolTriangulatedShape::ComputeNormals(face, polyTri);
-                    Standard_Boolean fixNormals = (faceOrientation == TopAbs_REVERSED) ^ (relativeTransform.VectorialPart().Determinant() < 0);
-                    if (fixNormals) {
-                        for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
-                            gp_Dir normal = polyTri->Normal(i).Reversed().Transformed(relativeTransform);
-                            normals.push_back(static_cast<float>(normal.X()));
-                            normals.push_back(static_cast<float>(normal.Y()));
-                            normals.push_back(static_cast<float>(normal.Z()));
-                        }
-                    } else {
-                        for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
-                            gp_Dir normal = polyTri->Normal(i).Transformed(relativeTransform);
-                            normals.push_back(static_cast<float>(normal.X()));
-                            normals.push_back(static_cast<float>(normal.Y()));
-                            normals.push_back(static_cast<float>(normal.Z()));
-                        }
-                    }
-
-                    Standard_Real umin, umax, vmin, vmax;
-                    BRepTools::UVBounds(face, umin, umax, vmin, vmax);
+                } else {
                     for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
-                        gp_Pnt2d uv = polyTri->UVNode(i);
-                        float u = static_cast<float>((uv.X() - umin) / (umax - umin));
-                        float v = static_cast<float>((uv.Y() - vmin) / (vmax - vmin));
-                        uvs.push_back(u);
-                        uvs.push_back(v);
+                        gp_Dir normal = polyTri->Normal(i).Transformed(relativeTransform);
+                        triData.normals.push_back(static_cast<float>(normal.X()));
+                        triData.normals.push_back(static_cast<float>(normal.Y()));
+                        triData.normals.push_back(static_cast<float>(normal.Z()));
                     }
+                }
 
-                    if (faceOrientation == TopAbs_REVERSED) {
-                        // reverse triangle winding order
-                        for (Standard_Integer i = 1; i <= polyTri->NbTriangles(); ++i) {
-                            Standard_Integer n1, n2, n3;
-                            polyTri->Triangle(i).Get(n1, n2, n3);
-                            // convert to zero-based index
-                            indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
+                Standard_Real umin, umax, vmin, vmax;
+                BRepTools::UVBounds(face, umin, umax, vmin, vmax);
+                for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
+                    gp_Pnt2d uv = polyTri->UVNode(i);
+                    float u = static_cast<float>((uv.X() - umin) / (umax - umin));
+                    float v = static_cast<float>((uv.Y() - vmin) / (vmax - vmin));
+                    triData.uvs.push_back(u);
+                    triData.uvs.push_back(v);
+                }
+
+                if (faceOrientation == TopAbs_REVERSED) {
+                    // reverse triangle winding order
+                    for (Standard_Integer i = 1; i <= polyTri->NbTriangles(); ++i) {
+                        Standard_Integer n1, n2, n3;
+                        polyTri->Triangle(i).Get(n1, n2, n3);
+                        // convert to zero-based index
+                        triData.indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
+                        triData.indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
+                        triData.indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
+                    }
+                } else {
+                    for (Standard_Integer i = 1; i <= polyTri->NbTriangles(); ++i) {
+                        Standard_Integer n1, n2, n3;
+                        polyTri->Triangle(i).Get(n1, n2, n3);
+                        // convert to zero-based index
+                        triData.indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
+                        triData.indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
+                        triData.indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
+                    }
+                }
+
+                // edge triangulation
+                {
+                    TopExp_Explorer edgeExplorer(face, TopAbs_EDGE);
+                    for (; edgeExplorer.More(); edgeExplorer.Next()) {
+                        TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
+
+                        // skip if already processed
+                        if (processedEdgeSet.find(edge.TShape().get()) != processedEdgeSet.end()) {
+                            continue;
                         }
-                    } else {
-                        for (Standard_Integer i = 1; i <= polyTri->NbTriangles(); ++i) {
-                            Standard_Integer n1, n2, n3;
-                            polyTri->Triangle(i).Get(n1, n2, n3);
-                            // convert to zero-based index
-                            indices.push_back(static_cast<uint32_t>(n1 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n3 - 1 + indexOffset));
-                            indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
+                        processedEdgeSet.insert(edge.TShape().get());
+
+                        gp_Trsf childTransform = edge.Location().Transformation();
+                        gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
+
+                        TopLoc_Location location;
+                        Handle(Poly_PolygonOnTriangulation) polypolyTri = BRep_Tool::PolygonOnTriangulation(edge, polyTri, location);
+                        if (!polypolyTri.IsNull()) {
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>(polypolyTri->NbNodes())); // vertex count
+
+                            const TColStd_Array1OfInteger& nodes = polypolyTri->Nodes();
+                            for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
+                                gp_Pnt pnt1 = polyTri->Node(nodes.Value(i)).Transformed(relativeTransform);
+                                gp_Pnt pnt2 = polyTri->Node(nodes.Value(i + 1)).Transformed(relativeTransform);
+                                
+                                lineData.positions.push_back(static_cast<float>(pnt1.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+
+                                lineData.positions.push_back(static_cast<float>(pnt2.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                            }
+                        } else {
+                            edge.Location(TopLoc_Location(relativeTransform));
+
+                            // fallback to curve sampling
+                            BRepAdaptor_Curve curve(edge);
+                            GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
+                            if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
+
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>(points.NbPoints())); // vertex count
+
+                            for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
+                                gp_Pnt pnt1 = points.Value(i);
+                                gp_Pnt pnt2 = points.Value(i + 1);
+
+                                lineData.positions.push_back(static_cast<float>(pnt1.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+
+                                lineData.positions.push_back(static_cast<float>(pnt2.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                            }
                         }
                     }
                 }
-            }
-        
-            if (!positions.empty() && !indices.empty()) {
-                TriGeometryInfo newTriInfo = {
-                    .id = static_cast<Standard_UInteger>(triGeometryMap.size()),
-                    .geometry = TriGeometry(
-                        std::move(positions),
-                        std::move(normals),
-                        std::move(uvs),
-                        std::move(indices),
-                        std::move(submeshIndices)
-                    )
-                };
-                const auto [triIt, triInserted] = triGeometryMap.emplace(shape.TShape().get(), std::move(newTriInfo));
-                triGeometryIndex = static_cast<Standard_Integer>(triIt->second.id);
             }
         }
+    
+        if (!triData.positions.empty() && !triData.indices.empty()) {
+            TriGeometryInfo newTriInfo = {
+                .id = static_cast<Standard_UInteger>(triGeometryMap.size()),
+                .geometry = std::move(triData)
+            };
+            const auto [triIt, triInserted] = triGeometryMap.emplace(shape.TShape().get(), std::move(newTriInfo));
+            triGeometryIndex = static_cast<Standard_Integer>(triIt->second.id);
+        }
 
-        {
-            std::vector<float> positions;
-            std::vector<uint32_t> submeshIndices;
-
-            TopExp_Explorer edgeExplorer(shape, TopAbs_EDGE);
-            for (; edgeExplorer.More(); edgeExplorer.Next()) {
-                TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
-
-                gp_Trsf childTransform = edge.Location().Transformation();
-                gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
-                edge.Location(TopLoc_Location(relativeTransform));
-
-                BRepAdaptor_Curve curve(edge);
-                GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
-                if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
-                for (int i = 1; i < points.NbPoints(); i++) {
-                    gp_Pnt pnt1 = points.Value(i);
-                    gp_Pnt pnt2 = points.Value(i + 1);
-                    
-                    positions.push_back(static_cast<float>(pnt1.X()));
-                    positions.push_back(static_cast<float>(pnt1.Y()));
-                    positions.push_back(static_cast<float>(pnt1.Z()));
-
-                    positions.push_back(static_cast<float>(pnt2.X()));
-                    positions.push_back(static_cast<float>(pnt2.Y()));
-                    positions.push_back(static_cast<float>(pnt2.Z()));
-                }
-            }
-
-            if (!positions.empty()) {
-                LineGeometryInfo newLineInfo = {
-                    .id = static_cast<Standard_UInteger>(lineGeometryMap.size()),
-                    .geometry = LineGeometry(
-                        std::move(positions),
-                        std::move(submeshIndices)
-                    )
-                };
-                const auto [lineIt, lineInserted] = lineGeometryMap.emplace(shape.TShape().get(), std::move(newLineInfo));
-                lineGeometryIndex = static_cast<Standard_Integer>(lineIt->second.id);
-            }
+        if (!lineData.positions.empty()) {
+            LineGeometryInfo newLineInfo = {
+                .id = static_cast<Standard_UInteger>(lineGeometryMap.size()),
+                .geometry = std::move(lineData)
+            };
+            const auto [lineIt, lineInserted] = lineGeometryMap.emplace(shape.TShape().get(), std::move(newLineInfo));
+            lineGeometryIndex = static_cast<Standard_Integer>(lineIt->second.id);
         }
         
         ProcessedShapeInfo processedInfo = {
@@ -347,8 +370,8 @@ private:
             
             gp_Trsf relativeTransform = parentWorldTransform.Inverted().Multiplied(shapeTransform);
             std::array<float, 16> matrixArray;
-            for (int row = 1; row < 4; row++) {
-                for (int col = 1; col <= 4; col++) {
+            for (Standard_Integer row = 1; row < 4; row++) {
+                for (Standard_Integer col = 1; col <= 4; col++) {
                     matrixArray[(col - 1) * 4 + (row - 1)] = static_cast<float>(relativeTransform.Value(row, col));
                 }
             }

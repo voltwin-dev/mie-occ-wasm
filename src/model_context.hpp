@@ -22,7 +22,7 @@
 #include "common.hpp"
 
 class TriGeometry {
-private:
+public:
     std::vector<float> positions;
     std::vector<float> normals;
     std::vector<float> uvs;
@@ -59,7 +59,7 @@ public:
 };
 
 class LineGeometry {
-private:
+public:
     std::vector<float> positions;
     std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount
 
