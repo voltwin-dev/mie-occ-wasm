@@ -70,8 +70,8 @@ Float32Array Mesh::getTransform() const {
     return Float32Array(emscripten::val(view));
 }
 
-MeshPrimitiveType Mesh::getPrimitiveType() const {
-    return primitiveType;
+MeshShapeType Mesh::getShapeType() const {
+    return shapeType;
 }
 
 int Mesh::getTriGeometryIndex() const {
@@ -153,18 +153,18 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
     emscripten::class_<Material>("Material")
         .function("getColor", &Material::getColor);
 
-    emscripten::enum_<MeshPrimitiveType>("MeshPrimitiveType")
-        .value("Shell", MeshPrimitiveType::Shell)
-        .value("Solid", MeshPrimitiveType::Solid)
-        .value("Edge", MeshPrimitiveType::Edge)
-        .value("Compound", MeshPrimitiveType::Compound)
-        .value("Compsolid", MeshPrimitiveType::Compsolid)
-        .value("Unknown", MeshPrimitiveType::Unknown);
+    emscripten::enum_<MeshShapeType>("MeshShapeType")
+        .value("Shell", MeshShapeType::Shell)
+        .value("Solid", MeshShapeType::Solid)
+        .value("Edge", MeshShapeType::Edge)
+        .value("Compound", MeshShapeType::Compound)
+        .value("Compsolid", MeshShapeType::Compsolid)
+        .value("Unknown", MeshShapeType::Unknown);
 
     emscripten::class_<Mesh>("Mesh")
         .function("getName", &Mesh::getName)
         .function("getTransform", &Mesh::getTransform)
-        .function("getPrimitiveType", &Mesh::getPrimitiveType)
+        .function("getShapeType", &Mesh::getShapeType)
         .function("getTriGeometryIndex", &Mesh::getTriGeometryIndex)
         .function("getLineGeometryIndex", &Mesh::getLineGeometryIndex)
         .function("getMaterialIndex", &Mesh::getMaterialIndex)

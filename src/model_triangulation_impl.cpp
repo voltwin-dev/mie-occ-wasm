@@ -204,8 +204,8 @@ private:
 
                 triData.submeshIndices.push_back(static_cast<uint32_t>(indexOffset)); // vertex start
                 triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbNodes())); // vertex count
-                triData.submeshIndices.push_back(static_cast<uint32_t>(triData.indices.size())); // index start
-                triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
+                // triData.submeshIndices.push_back(static_cast<uint32_t>(triData.indices.size())); // index start
+                // triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
 
                 for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
                     gp_Pnt pnt = polyTri->Node(i).Transformed(relativeTransform);
@@ -380,14 +380,14 @@ private:
             matrixArray[11] = 0.0f;
             matrixArray[15] = 1.0f;
 
-            MeshPrimitiveType primitiveType;
+            MeshShapeType shapeType;
             switch (shape.ShapeType()) {
-            case TopAbs_COMPOUND: primitiveType = MeshPrimitiveType::Compound; break;
-            case TopAbs_COMPSOLID: primitiveType = MeshPrimitiveType::Compsolid; break;
-            case TopAbs_SOLID: primitiveType = MeshPrimitiveType::Solid; break;
-            case TopAbs_SHELL: primitiveType = MeshPrimitiveType::Shell; break;
-            case TopAbs_EDGE: primitiveType = MeshPrimitiveType::Edge; break;
-            default: primitiveType = MeshPrimitiveType::Unknown; break;
+            case TopAbs_COMPOUND: shapeType = MeshShapeType::Compound; break;
+            case TopAbs_COMPSOLID: shapeType = MeshShapeType::Compsolid; break;
+            case TopAbs_SOLID: shapeType = MeshShapeType::Solid; break;
+            case TopAbs_SHELL: shapeType = MeshShapeType::Shell; break;
+            case TopAbs_EDGE: shapeType = MeshShapeType::Edge; break;
+            default: shapeType = MeshShapeType::Unknown; break;
             }
 
             // resolve shape name and material index
@@ -430,7 +430,7 @@ private:
             meshes.push_back(Mesh(
                 std::move(shapeName),
                 matrixArray,
-                primitiveType,
+                shapeType,
                 triGeometryIndex,
                 lineGeometryIndex,
                 materialIndex,

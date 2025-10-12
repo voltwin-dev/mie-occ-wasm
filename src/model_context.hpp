@@ -27,7 +27,7 @@ public:
     std::vector<float> normals;
     std::vector<float> uvs;
     std::vector<uint32_t> indices; // triangle indices
-    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount, indicesStart, indicesCount
+    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount
 
 public:
     TriGeometry() = default;
@@ -93,7 +93,7 @@ public:
     Float32Array getColor() const;
 };
 
-enum class MeshPrimitiveType {
+enum class MeshShapeType {
     Shell, // represented as tri and line
     Solid, // represented as tri and line
     Edge,  // represented as line
@@ -106,7 +106,7 @@ class Mesh {
 private:
     std::string name;
     std::array<float, 16> transform;
-    MeshPrimitiveType primitiveType;
+    MeshShapeType shapeType;
     int triGeometryIndex;
     int lineGeometryIndex;
     int materialIndex;
@@ -116,7 +116,7 @@ public:
     Mesh(
         std::string name,
         const std::array<float, 16>& transform,
-        MeshPrimitiveType primitiveType,
+        MeshShapeType shapeType,
         int triGeometryIndex,
         int lineGeometryIndex,
         int materialIndex,
@@ -124,7 +124,7 @@ public:
     )
         : name(std::move(name))
         , transform(transform)
-        , primitiveType(primitiveType)
+        , shapeType(shapeType)
         , triGeometryIndex(triGeometryIndex)
         , lineGeometryIndex(lineGeometryIndex)
         , materialIndex(materialIndex)
@@ -133,7 +133,7 @@ public:
     }
     const std::string& getName() const;
     Float32Array getTransform() const;
-    MeshPrimitiveType getPrimitiveType() const;
+    MeshShapeType getShapeType() const;
     int getTriGeometryIndex() const;
     int getLineGeometryIndex() const;
     int getMaterialIndex() const;
