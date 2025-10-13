@@ -27,7 +27,7 @@ public:
     std::vector<float> normals;
     std::vector<float> uvs;
     std::vector<uint32_t> indices; // triangle indices
-    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount
+    std::vector<uint32_t> submeshIndices; // verticesCount
 
 public:
     TriGeometry() = default;
@@ -61,7 +61,7 @@ public:
 class LineGeometry {
 public:
     std::vector<float> positions;
-    std::vector<uint32_t> submeshIndices; // verticesStart, verticesCount
+    std::vector<uint32_t> submeshIndices; // verticesCount
 
 public:
     LineGeometry() = default;
