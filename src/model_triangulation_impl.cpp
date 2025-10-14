@@ -281,8 +281,10 @@ private:
                         TopLoc_Location location;
                         Handle(Poly_PolygonOnTriangulation) polypolyTri = BRep_Tool::PolygonOnTriangulation(edge, polyTri, location);
                         if (!polypolyTri.IsNull()) {
+                            if (polypolyTri->NbNodes() < 2) continue; // NOTE: this might be unreachable
+
                             // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                            lineData.submeshIndices.push_back(static_cast<uint32_t>(polypolyTri->NbNodes())); // vertex count
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>((polypolyTri->NbNodes() - 1) * 2)); // vertex count
 
                             const TColStd_Array1OfInteger& nodes = polypolyTri->Nodes();
                             for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
@@ -306,7 +308,7 @@ private:
                             if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
 
                             // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                            lineData.submeshIndices.push_back(static_cast<uint32_t>(points.NbPoints())); // vertex count
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
 
                             for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
                                 gp_Pnt pnt1 = points.Value(i);
