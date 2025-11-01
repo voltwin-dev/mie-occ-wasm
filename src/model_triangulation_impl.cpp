@@ -112,7 +112,7 @@ public:
             TDF_Label childLabel = it.Value();
             TopoDS_Shape shape;
             if (shapeTool->GetShape(childLabel, shape) && shapeTool->IsFree(childLabel)) {
-                BRepTools::Clean(shape, true);
+                BRepTools::Clean(shape, Standard_True);
             }
         }
 
@@ -181,9 +181,9 @@ private:
         BRepMesh_IncrementalMesh mesh(
             shape, // The shape to mesh
             deflection, // Linear deflection
-            true,  // Relative
+            Standard_True,  // Relative
             ANGLE_DEFLECTION, // Angular deflection
-            true   // In parallel
+            Standard_True   // In parallel
         );
 
         LineGeometry lineData;
