@@ -24,11 +24,9 @@
 #include <gp_Trsf.hxx>
 #include <gp_Pnt.hxx>
 #include <Poly_Triangulation.hxx>
-#include <Poly_Polygon3D.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
 #include <Prs3d.hxx>
 #include <Quantity_Color.hxx>
-#include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDF_ChildIterator.hxx>
@@ -44,9 +42,6 @@
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_TShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
-
-#include <TopExp.hxx>
-#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 
 class TriangulationContext {
     struct TriGeometryInfo {
@@ -267,105 +262,67 @@ private:
                         triData.indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
                     }
                 }
-            }
-        }
 
-        TopTools_IndexedMapOfShape edgeMap;
-        TopExp::MapShapes(shape, TopAbs_EDGE, edgeMap);
+                // edge triangulation
+                {
+                    TopExp_Explorer edgeExplorer(face, TopAbs_EDGE);
+                    for (; edgeExplorer.More(); edgeExplorer.Next()) {
+                        TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
 
-        TopTools_IndexedDataMapOfShapeListOfShape edgeFaceMap;
-        TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeFaceMap);
-        for (Standard_Integer ei = 1; ei <= edgeFaceMap.Extent(); ++ei) {
-            const TopTools_ListOfShape& faceList = edgeFaceMap.FindFromIndex(ei);
-            if (faceList.IsEmpty()) continue;
-
-            TopoDS_Edge edge = TopoDS::Edge(edgeMap.FindKey(ei));
-            {
-                // skip if already processed
-                if (processedEdgeSet.find(edge.TShape().get()) != processedEdgeSet.end()) {
-                    continue;
-                }
-                processedEdgeSet.insert(edge.TShape().get());
-
-                gp_Trsf childTransform = edge.Location().Transformation();
-                gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
-
-                TopLoc_Location location;
-                { // try get 3D polygon first
-                    Handle(Poly_Polygon3D) polypolygon = BRep_Tool::Polygon3D(edge, location);
-                    if (!polypolygon.IsNull()) {
-                        std::cout << "got polygon3d with " << polypolygon->NbNodes() << " nodes\n";
-                        if (polypolygon->NbNodes() < 2) continue; // NOTE: this might be unreachable
-
-                        // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                        lineData.submeshIndices.push_back(static_cast<uint32_t>((polypolygon->NbNodes() - 1) * 2)); // vertex count
-
-                        const TColgp_Array1OfPnt& nodes = polypolygon->Nodes();
-                        for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
-                            gp_Pnt pnt1 = nodes.Value(i).Transformed(relativeTransform);
-                            gp_Pnt pnt2 = nodes.Value(i + 1).Transformed(relativeTransform);
-                            
-                            lineData.positions.push_back(static_cast<float>(pnt1.X()));
-                            lineData.positions.push_back(static_cast<float>(pnt1.Y()));
-                            lineData.positions.push_back(static_cast<float>(pnt1.Z()));
-
-                            lineData.positions.push_back(static_cast<float>(pnt2.X()));
-                            lineData.positions.push_back(static_cast<float>(pnt2.Y()));
-                            lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                        // skip if already processed
+                        if (processedEdgeSet.find(edge.TShape().get()) != processedEdgeSet.end()) {
+                            continue;
                         }
-                        continue;
-                    }
-                }
-                { // try get polygon on triangulation
-                    TopLoc_Location location;
-                    const TopoDS_Face& firstFace = TopoDS::Face(edgeFaceMap.FindFromIndex(ei).First());
-                    Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(firstFace, location);
-                    Handle(Poly_PolygonOnTriangulation) polypolyTri = BRep_Tool::PolygonOnTriangulation(edge, polyTri, location);
-                    if (!polypolyTri.IsNull()) {
-                        std::cout << "got polygonontriangulation with " << polypolyTri->NbNodes() << " nodes\n";
-                        if (polypolyTri->NbNodes() < 2) continue; // NOTE: this might be unreachable
+                        processedEdgeSet.insert(edge.TShape().get());
 
-                        // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                        lineData.submeshIndices.push_back(static_cast<uint32_t>((polypolyTri->NbNodes() - 1) * 2)); // vertex count
+                        gp_Trsf childTransform = edge.Location().Transformation();
+                        gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
 
-                        const TColStd_Array1OfInteger& nodes = polypolyTri->Nodes();
-                        for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
-                            gp_Pnt pnt1 = polyTri->Node(nodes.Value(i)).Transformed(relativeTransform);
-                            gp_Pnt pnt2 = polyTri->Node(nodes.Value(i + 1)).Transformed(relativeTransform);
-                            
-                            lineData.positions.push_back(static_cast<float>(pnt1.X()));
-                            lineData.positions.push_back(static_cast<float>(pnt1.Y()));
-                            lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+                        TopLoc_Location location;
+                        Handle(Poly_PolygonOnTriangulation) polypolyTri = BRep_Tool::PolygonOnTriangulation(edge, polyTri, location);
+                        if (!polypolyTri.IsNull()) {
+                            if (polypolyTri->NbNodes() < 2) continue; // NOTE: this might be unreachable
 
-                            lineData.positions.push_back(static_cast<float>(pnt2.X()));
-                            lineData.positions.push_back(static_cast<float>(pnt2.Y()));
-                            lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                            // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>((polypolyTri->NbNodes() - 1) * 2)); // vertex count
+
+                            const TColStd_Array1OfInteger& nodes = polypolyTri->Nodes();
+                            for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
+                                gp_Pnt pnt1 = polyTri->Node(nodes.Value(i)).Transformed(relativeTransform);
+                                gp_Pnt pnt2 = polyTri->Node(nodes.Value(i + 1)).Transformed(relativeTransform);
+                                
+                                lineData.positions.push_back(static_cast<float>(pnt1.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+
+                                lineData.positions.push_back(static_cast<float>(pnt2.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                            }
+                        } else {
+                            edge.Location(TopLoc_Location(relativeTransform));
+
+                            // fallback to curve sampling
+                            BRepAdaptor_Curve curve(edge);
+                            GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
+                            if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
+
+                            // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                            lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
+
+                            for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
+                                gp_Pnt pnt1 = points.Value(i);
+                                gp_Pnt pnt2 = points.Value(i + 1);
+
+                                lineData.positions.push_back(static_cast<float>(pnt1.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+
+                                lineData.positions.push_back(static_cast<float>(pnt2.X()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Y()));
+                                lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                            }
                         }
-                        continue;
-                    }
-                }
-                { // finally, use curve sampling
-                    edge.Location(TopLoc_Location(relativeTransform));
-
-                    // fallback to curve sampling
-                    BRepAdaptor_Curve curve(edge);
-                    GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
-                    if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
-
-                    // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                    lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
-
-                    for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
-                        gp_Pnt pnt1 = points.Value(i);
-                        gp_Pnt pnt2 = points.Value(i + 1);
-
-                        lineData.positions.push_back(static_cast<float>(pnt1.X()));
-                        lineData.positions.push_back(static_cast<float>(pnt1.Y()));
-                        lineData.positions.push_back(static_cast<float>(pnt1.Z()));
-
-                        lineData.positions.push_back(static_cast<float>(pnt2.X()));
-                        lineData.positions.push_back(static_cast<float>(pnt2.Y()));
-                        lineData.positions.push_back(static_cast<float>(pnt2.Z()));
                     }
                 }
             }
