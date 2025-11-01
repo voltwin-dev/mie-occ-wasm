@@ -262,23 +262,27 @@ private:
                         triData.indices.push_back(static_cast<uint32_t>(n2 - 1 + indexOffset));
                     }
                 }
+            }
 
-                // edge triangulation
-                {
-                    TopExp_Explorer edgeExplorer(face, TopAbs_EDGE);
-                    for (; edgeExplorer.More(); edgeExplorer.Next()) {
-                        TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
+            // edge triangulation
+            {
+                TopExp_Explorer edgeExplorer(face, TopAbs_EDGE);
+                for (; edgeExplorer.More(); edgeExplorer.Next()) {
+                    TopoDS_Edge edge = TopoDS::Edge(edgeExplorer.Current());
 
-                        // skip if already processed
-                        if (processedEdgeSet.find(edge.TShape().get()) != processedEdgeSet.end()) {
-                            continue;
-                        }
-                        processedEdgeSet.insert(edge.TShape().get());
+                    // skip if already processed
+                    if (processedEdgeSet.find(edge.TShape().get()) != processedEdgeSet.end()) {
+                        continue;
+                    }
+                    processedEdgeSet.insert(edge.TShape().get());
 
-                        gp_Trsf childTransform = edge.Location().Transformation();
-                        gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
+                    gp_Trsf childTransform = edge.Location().Transformation();
+                    gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
 
-                        TopLoc_Location location;
+                    // note: we can not reuse Poly_Triangulation from face here because it's stateful
+                    TopLoc_Location location;
+                    Handle(Poly_Triangulation) polyTri = BRep_Tool::Triangulation(face, location);
+                    if (!polyTri.IsNull()) {
                         Handle(Poly_PolygonOnTriangulation) polypolyTri = BRep_Tool::PolygonOnTriangulation(edge, polyTri, location);
                         if (!polypolyTri.IsNull()) {
                             if (polypolyTri->NbNodes() < 2) continue; // NOTE: this might be unreachable
@@ -299,30 +303,34 @@ private:
                                 lineData.positions.push_back(static_cast<float>(pnt2.Y()));
                                 lineData.positions.push_back(static_cast<float>(pnt2.Z()));
                             }
-                        } else {
-                            edge.Location(TopLoc_Location(relativeTransform));
-
-                            // fallback to curve sampling
-                            BRepAdaptor_Curve curve(edge);
-                            GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
-                            if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
-
-                            // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                            lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
-
-                            for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
-                                gp_Pnt pnt1 = points.Value(i);
-                                gp_Pnt pnt2 = points.Value(i + 1);
-
-                                lineData.positions.push_back(static_cast<float>(pnt1.X()));
-                                lineData.positions.push_back(static_cast<float>(pnt1.Y()));
-                                lineData.positions.push_back(static_cast<float>(pnt1.Z()));
-
-                                lineData.positions.push_back(static_cast<float>(pnt2.X()));
-                                lineData.positions.push_back(static_cast<float>(pnt2.Y()));
-                                lineData.positions.push_back(static_cast<float>(pnt2.Z()));
-                            }
+                            continue;
                         }
+                    }
+                        
+                    { // fallback to BRep curve sampling
+                        edge.Location(TopLoc_Location(relativeTransform));
+
+                        // fallback to curve sampling
+                        BRepAdaptor_Curve curve(edge);
+                        GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
+                        if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
+
+                        // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                        lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
+
+                        for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
+                            gp_Pnt pnt1 = points.Value(i);
+                            gp_Pnt pnt2 = points.Value(i + 1);
+
+                            lineData.positions.push_back(static_cast<float>(pnt1.X()));
+                            lineData.positions.push_back(static_cast<float>(pnt1.Y()));
+                            lineData.positions.push_back(static_cast<float>(pnt1.Z()));
+
+                            lineData.positions.push_back(static_cast<float>(pnt2.X()));
+                            lineData.positions.push_back(static_cast<float>(pnt2.Y()));
+                            lineData.positions.push_back(static_cast<float>(pnt2.Z()));
+                        }
+                        continue;
                     }
                 }
             }
