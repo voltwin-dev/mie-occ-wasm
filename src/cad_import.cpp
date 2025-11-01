@@ -15,6 +15,9 @@
 #include <streambuf>
 #include <istream>
 #include <optional>
+#include <mutex>
+#include <thread>
+#include <memory>
 
 #include <STEPCAFControl_Reader.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -28,11 +31,39 @@ public:
     }
 };
 
-class CadImport {
+#ifdef __EMSCRIPTEN_PTHREADS__
+class CadImportAsyncTask {
+private:
+    std::mutex mutex;
+    bool completed;
+    std::optional<ModelContext> modelContext;
+
 public:
-    static std::optional<ModelContext> fromStep(const Uint8Array& buffer) {
-        std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(buffer);
-        
+    CadImportAsyncTask()
+        : completed(false), modelContext(std::nullopt)
+    { }
+
+    bool isCompleted() {
+        std::lock_guard<std::mutex> lock(mutex);
+        return completed;
+    }
+
+    std::optional<ModelContext> takeModelContext() {
+        std::lock_guard<std::mutex> lock(mutex);
+        return std::move(modelContext);
+    }
+
+    void setModelContext(std::optional<ModelContext>&& context) {
+        std::lock_guard<std::mutex> lock(mutex);
+        modelContext = std::move(context);
+        completed = true;
+    }
+};
+#endif
+
+class CadImport {
+private:
+    static std::optional<ModelContext> fromStepInternal(std::vector<uint8_t> data) {
         STEPCAFControl_Reader stepCafReader;
         stepCafReader.SetProductMetaMode(Standard_True);
 
@@ -57,9 +88,35 @@ public:
 
         return ModelContext(doc);
     }
+
+public:
+    static std::optional<ModelContext> fromStep(const Uint8Array& buffer) {
+        std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(buffer);
+        return fromStepInternal(std::move(data));
+    }
+
+#ifdef __EMSCRIPTEN_PTHREADS__
+    static void fromStepAsync(const Uint8Array& buffer, CadImportAsyncTask& task) {
+        std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(buffer);
+        std::thread([data = std::move(data), &task]() {
+            task.setModelContext(fromStepInternal(std::move(data)));
+        }).detach();
+    }
+#endif
 };
 
 EMSCRIPTEN_BINDINGS(model_context) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+    emscripten::class_<CadImportAsyncTask>("CadImportAsyncTask")
+        .constructor<>()
+        .function("isCompleted", &CadImportAsyncTask::isCompleted)
+        .function("takeModelContext", &CadImportAsyncTask::takeModelContext, emscripten::return_value_policy::take_ownership());
+#endif
+
     emscripten::class_<CadImport>("CadImport")
-        .class_function("fromStep", &CadImport::fromStep, emscripten::return_value_policy::take_ownership());
+        .class_function("fromStep", &CadImport::fromStep, emscripten::return_value_policy::take_ownership())
+#ifdef __EMSCRIPTEN_PTHREADS__
+        .class_function("fromStepAsync", &CadImport::fromStepAsync)
+#endif
+        ;
 }
