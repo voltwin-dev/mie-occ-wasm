@@ -380,8 +380,8 @@ private:
             
             gp_Trsf relativeTransform = parentWorldTransform.Inverted().Multiplied(shapeTransform);
             std::array<float, 16> matrixArray;
-            for (Standard_Integer row = 1; row < 4; row++) {
-                for (Standard_Integer col = 1; col <= 4; col++) {
+            for (Standard_Integer row = 1; row < 4; ++row) {
+                for (Standard_Integer col = 1; col <= 4; ++col) {
                     matrixArray[(col - 1) * 4 + (row - 1)] = static_cast<float>(relativeTransform.Value(row, col));
                 }
             }
