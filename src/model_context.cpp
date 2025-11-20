@@ -10,6 +10,9 @@
 #include <emscripten/bind.h>
 
 #include <utility>
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include <thread>
+#endif
 
 #include "model_triangulation_impl.hpp"
 
@@ -127,12 +130,25 @@ Mesh& TriangulatedModel::getMesh(size_t index) {
 // ModelContext methods
 
 void ModelContext::computeTriangulation() {
+#ifdef __EMSCRIPTEN_PTHREADS__
+    std::lock_guard<std::mutex> lock(triangulationMutex);
+#endif
+
     if (triangulatedModel.has_value()) {
         return;
     }
 
     triangulatedModel = ModelTriangulationImpl::computeTriangulation(shapeTool, colorTool);
 }
+
+#ifdef __EMSCRIPTEN_PTHREADS__
+void ModelContext::computeTriangulationAsync(TriangulationAsyncTask& task) {
+    std::thread([this, &task]() {
+        computeTriangulation();
+        task.setValue(triangulatedModel.has_value() ? true : false);
+    }).detach();
+}
+#endif
 
 std::optional<TriangulatedModel>& ModelContext::getTriangulatedModel() {
     return triangulatedModel;
@@ -182,8 +198,15 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
 
     emscripten::register_optional<TriangulatedModel>();
 
+#ifdef __EMSCRIPTEN_PTHREADS__
+    CREATE_EMSCRIPTEN_ASYNC_TASK_BINDINGS(TriangulationAsyncTask)       
+#endif
+
     emscripten::class_<ModelContext>("ModelContext")
         .function("computeTriangulation", &ModelContext::computeTriangulation)
+#ifdef __EMSCRIPTEN_PTHREADS__
+        .function("computeTriangulationAsync", &ModelContext::computeTriangulationAsync)
+#endif
         .function("getTriangulatedModel", &ModelContext::getTriangulatedModel, emscripten::return_value_policy::reference());
 
     emscripten::register_optional<ModelContext>();

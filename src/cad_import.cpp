@@ -6,6 +6,9 @@
 // by the Free Software Foundation.
 
 #include "model_context.hpp"
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include "async_task.hpp"
+#endif
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
@@ -15,8 +18,9 @@
 #include <streambuf>
 #include <istream>
 #include <optional>
-#include <mutex>
+#ifdef __EMSCRIPTEN_PTHREADS__
 #include <thread>
+#endif
 #include <memory>
 
 #include <STEPCAFControl_Reader.hxx>
@@ -32,33 +36,7 @@ public:
 };
 
 #ifdef __EMSCRIPTEN_PTHREADS__
-class CadImportAsyncTask {
-private:
-    std::mutex mutex;
-    bool completed;
-    std::optional<ModelContext> modelContext;
-
-public:
-    CadImportAsyncTask()
-        : completed(false), modelContext(std::nullopt)
-    { }
-
-    bool isCompleted() {
-        std::lock_guard<std::mutex> lock(mutex);
-        return completed;
-    }
-
-    std::optional<ModelContext> takeModelContext() {
-        std::lock_guard<std::mutex> lock(mutex);
-        return std::move(modelContext);
-    }
-
-    void setModelContext(std::optional<ModelContext>&& context) {
-        std::lock_guard<std::mutex> lock(mutex);
-        modelContext = std::move(context);
-        completed = true;
-    }
-};
+using CadImportAsyncTask = AsyncTask<ModelContext>;
 #endif
 
 class CadImport {
@@ -99,7 +77,7 @@ public:
     static void fromStepAsync(const Uint8Array& buffer, CadImportAsyncTask& task) {
         std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(buffer);
         std::thread([data = std::move(data), &task]() {
-            task.setModelContext(fromStepInternal(std::move(data)));
+            task.setValue(fromStepInternal(std::move(data)));
         }).detach();
     }
 #endif
@@ -107,10 +85,7 @@ public:
 
 EMSCRIPTEN_BINDINGS(model_context) {
 #ifdef __EMSCRIPTEN_PTHREADS__
-    emscripten::class_<CadImportAsyncTask>("CadImportAsyncTask")
-        .constructor<>()
-        .function("isCompleted", &CadImportAsyncTask::isCompleted)
-        .function("takeModelContext", &CadImportAsyncTask::takeModelContext, emscripten::return_value_policy::take_ownership());
+    CREATE_EMSCRIPTEN_ASYNC_TASK_BINDINGS(CadImportAsyncTask)
 #endif
 
     emscripten::class_<CadImport>("CadImport")

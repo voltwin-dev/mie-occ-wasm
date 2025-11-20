@@ -14,12 +14,18 @@
 #include <optional>
 #include <string>
 #include <vector>
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include <mutex>
+#endif
 
 #include <TDocStd_Document.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <gp_Trsf.hxx>
 
 #include "common.hpp"
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include "async_task.hpp"
+#endif
 
 class TriGeometry {
 public:
@@ -175,6 +181,10 @@ public:
     Mesh& getMesh(size_t index);
 };
 
+#ifdef __EMSCRIPTEN_PTHREADS__
+using TriangulationAsyncTask = AsyncTask<bool>;
+#endif
+
 class ModelContext {
 private:
     Handle(TDocStd_Document) doc;
@@ -182,6 +192,9 @@ private:
     Handle(XCAFDoc_ColorTool) colorTool;
 
     std::optional<TriangulatedModel> triangulatedModel;
+#ifdef __EMSCRIPTEN_PTHREADS__
+    mutable std::mutex triangulationMutex;
+#endif
 
 public:
     ModelContext(Handle(TDocStd_Document) document)
@@ -191,6 +204,59 @@ public:
     {
     }
 
+    ModelContext(const ModelContext& other) :
+        doc(other.doc),
+        shapeTool(other.shapeTool),
+        colorTool(other.colorTool)
+    {
+#ifdef __EMSCRIPTEN_PTHREADS__
+        std::lock_guard<std::mutex> lock(other.triangulationMutex);
+#endif
+        triangulatedModel = other.triangulatedModel;
+    }
+
+    ModelContext(ModelContext&& other) noexcept :
+        doc(std::move(other.doc)),
+        shapeTool(std::move(other.shapeTool)),
+        colorTool(std::move(other.colorTool))
+    {
+#ifdef __EMSCRIPTEN_PTHREADS__
+        std::lock_guard<std::mutex> lock(other.triangulationMutex);
+#endif
+        triangulatedModel = std::move(other.triangulatedModel);
+    }
+
+    ModelContext& operator=(const ModelContext& other) {
+        if (this != &other) {
+            doc = other.doc;
+            shapeTool = other.shapeTool;
+            colorTool = other.colorTool;
+#ifdef __EMSCRIPTEN_PTHREADS__
+            std::lock_guard<std::mutex> lockOther(other.triangulationMutex);
+            std::lock_guard<std::mutex> lockThis(triangulationMutex);
+#endif
+            triangulatedModel = other.triangulatedModel;
+        }
+        return *this;
+    }
+
+    ModelContext& operator=(ModelContext&& other) noexcept {
+        if (this != &other) {
+            doc = std::move(other.doc);
+            shapeTool = std::move(other.shapeTool);
+            colorTool = std::move(other.colorTool);
+#ifdef __EMSCRIPTEN_PTHREADS__
+            std::lock_guard<std::mutex> lockOther(other.triangulationMutex);
+            std::lock_guard<std::mutex> lockThis(triangulationMutex);
+#endif
+            triangulatedModel = std::move(other.triangulatedModel);
+        }
+        return *this;
+    }
+
     void computeTriangulation();
+#ifdef __EMSCRIPTEN_PTHREADS__
+    void computeTriangulationAsync(TriangulationAsyncTask& task);
+#endif
     std::optional<TriangulatedModel>& getTriangulatedModel();
 };
