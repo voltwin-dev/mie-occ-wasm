@@ -55,6 +55,13 @@ Uint32Array LineGeometry::getSubmeshIndices() const {
     return Uint32Array(emscripten::val(view));
 }
 
+// PointGeometry methods
+
+Float32Array PointGeometry::getPositions() const {
+    emscripten::memory_view view(positions.size(), reinterpret_cast<const float*>(positions.data()));
+    return Float32Array(emscripten::val(view));
+}
+
 // Material methods
 
 Float32Array Material::getColor() const {
@@ -85,6 +92,10 @@ int Mesh::getLineGeometryIndex() const {
     return lineGeometryIndex;
 }
 
+int Mesh::getPointGeometryIndex() const {
+    return pointGeometryIndex;
+}
+
 int Mesh::getMaterialIndex() const {
     return materialIndex;
 }
@@ -109,6 +120,14 @@ size_t TriangulatedModel::getLineCount() const {
 
 LineGeometry& TriangulatedModel::getLine(size_t index) {
     return lines[index];
+}
+
+size_t TriangulatedModel::getPointCount() const {
+    return points.size();
+}
+
+PointGeometry& TriangulatedModel::getPoint(size_t index) {
+    return points[index];
 }
 
 size_t TriangulatedModel::getMaterialCount() const {
@@ -166,6 +185,9 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getPositions", &LineGeometry::getPositions)
         .function("getSubmeshIndices", &LineGeometry::getSubmeshIndices);
 
+    emscripten::class_<PointGeometry>("PointGeometry")
+        .function("getPositions", &PointGeometry::getPositions);
+
     emscripten::class_<Material>("Material")
         .function("getColor", &Material::getColor);
 
@@ -183,6 +205,7 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getShapeType", &Mesh::getShapeType)
         .function("getTriGeometryIndex", &Mesh::getTriGeometryIndex)
         .function("getLineGeometryIndex", &Mesh::getLineGeometryIndex)
+        .function("getPointGeometryIndex", &Mesh::getPointGeometryIndex)
         .function("getMaterialIndex", &Mesh::getMaterialIndex)
         .function("getParentMeshIndex", &Mesh::getParentMeshIndex);
 
@@ -191,6 +214,8 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getTri", &TriangulatedModel::getTri, emscripten::return_value_policy::reference())
         .function("getLineCount", &TriangulatedModel::getLineCount)
         .function("getLine", &TriangulatedModel::getLine, emscripten::return_value_policy::reference())
+        .function("getPointCount", &TriangulatedModel::getPointCount)
+        .function("getPoint", &TriangulatedModel::getPoint, emscripten::return_value_policy::reference())
         .function("getMaterialCount", &TriangulatedModel::getMaterialCount)
         .function("getMaterial", &TriangulatedModel::getMaterial, emscripten::return_value_policy::reference())
         .function("getMeshCount", &TriangulatedModel::getMeshCount)

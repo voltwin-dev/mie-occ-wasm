@@ -41,6 +41,7 @@
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_TShape.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 
 class TriangulationContext {
@@ -52,6 +53,10 @@ class TriangulationContext {
         Standard_Size id;
         LineGeometry geometry;
     };
+    struct PointGeometryInfo {
+        Standard_Size id;
+        PointGeometry geometry;
+    };
     struct MaterialInfo {
         Standard_Size id;
         Material material;
@@ -59,6 +64,7 @@ class TriangulationContext {
     struct ProcessedShapeInfo {
         Standard_Integer triGeometryIndex;
         Standard_Integer lineGeometryIndex;
+        Standard_Integer pointGeometryIndex;
     };
 
 private:
@@ -68,6 +74,7 @@ private:
     // output data
     std::unordered_map<TopoDS_TShape*, TriGeometryInfo> triGeometryMap;
     std::unordered_map<TopoDS_TShape*, LineGeometryInfo> lineGeometryMap;
+    std::unordered_map<TopoDS_TShape*, PointGeometryInfo> pointGeometryMap;
     std::unordered_map<TDF_Label, MaterialInfo> materialMap;
     std::vector<Mesh> meshes;
 
@@ -75,6 +82,8 @@ private:
     std::unordered_map<TopoDS_TShape*, ProcessedShapeInfo> processedShapeMap;
     // for remove edge duplication
     std::unordered_set<TopoDS_TShape*> processedEdgeSet;
+    // for remove point duplication
+    std::unordered_set<TopoDS_TShape*> processedPointSet;
 public:
     TriangulationContext(
         Handle(XCAFDoc_ShapeTool) shapeTool,
@@ -96,6 +105,7 @@ public:
         
         processedShapeMap.clear();
         processedEdgeSet.clear();
+        processedPointSet.clear();
 
         std::vector<TriGeometry> tris(triGeometryMap.size());
         for (const auto& [_, triInfo] : triGeometryMap) tris[triInfo.id] = std::move(triInfo.geometry);
@@ -103,6 +113,9 @@ public:
         std::vector<LineGeometry> lines(lineGeometryMap.size());
         for (const auto& [_, lineInfo] : lineGeometryMap) lines[lineInfo.id] = std::move(lineInfo.geometry);
         lineGeometryMap.clear();
+        std::vector<PointGeometry> points(pointGeometryMap.size());
+        for (const auto& [_, pointInfo] : pointGeometryMap) points[pointInfo.id] = std::move(pointInfo.geometry);
+        pointGeometryMap.clear();
         std::vector<Material> materials(materialMap.size());
         for (const auto& [_, matInfo] : materialMap) materials[matInfo.id] = std::move(matInfo.material);
         materialMap.clear();
@@ -119,6 +132,7 @@ public:
         return TriangulatedModel(
             std::move(tris),
             std::move(lines),
+            std::move(points),
             std::move(materials),
             std::move(meshes)
         );
@@ -167,6 +181,7 @@ private:
 
         Standard_Integer triGeometryIndex = -1;
         Standard_Integer lineGeometryIndex = -1;
+        Standard_Integer pointGeometryIndex = -1;
 
         gp_Trsf parentTransform = shape.Location().Transformation(); // parent global transform
 
@@ -186,8 +201,9 @@ private:
             Standard_True   // In parallel
         );
 
-        LineGeometry lineData;
         TriGeometry triData;
+        LineGeometry lineData;
+        PointGeometry pointData;
 
         TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
         for (; faceExplorer.More(); faceExplorer.Next()) {
@@ -335,7 +351,31 @@ private:
                 }
             }
         }
-    
+
+        // Vertex traversal for point geometry
+        {
+            TopExp_Explorer vertexExplorer(shape, TopAbs_VERTEX);
+            for (; vertexExplorer.More(); vertexExplorer.Next()) {
+                TopoDS_Vertex vertex = TopoDS::Vertex(vertexExplorer.Current());
+
+                // skip if already processed
+                if (processedPointSet.find(vertex.TShape().get()) != processedPointSet.end()) {
+                    continue;
+                }
+                processedPointSet.insert(vertex.TShape().get());
+
+                gp_Trsf childTransform = vertex.Location().Transformation();
+                gp_Trsf relativeTransform = parentTransform.Inverted().Multiplied(childTransform); // relative transform from parent to child
+
+                vertex.Location(TopLoc_Location(relativeTransform));
+
+                gp_Pnt pnt = BRep_Tool::Pnt(vertex);
+                pointData.positions.push_back(static_cast<float>(pnt.X()));
+                pointData.positions.push_back(static_cast<float>(pnt.Y()));
+                pointData.positions.push_back(static_cast<float>(pnt.Z()));
+            }
+        }
+
         if (!triData.positions.empty() && !triData.indices.empty()) {
             TriGeometryInfo newTriInfo = {
                 .id = static_cast<Standard_UInteger>(triGeometryMap.size()),
@@ -353,10 +393,20 @@ private:
             const auto [lineIt, lineInserted] = lineGeometryMap.emplace(shape.TShape().get(), std::move(newLineInfo));
             lineGeometryIndex = static_cast<Standard_Integer>(lineIt->second.id);
         }
+
+        if (!pointData.positions.empty()) {
+            PointGeometryInfo newPointInfo = {
+                .id = static_cast<Standard_UInteger>(pointGeometryMap.size()),
+                .geometry = std::move(pointData)
+            };
+            const auto [pointIt, pointInserted] = pointGeometryMap.emplace(shape.TShape().get(), std::move(newPointInfo));
+            pointGeometryIndex = static_cast<Standard_Integer>(pointIt->second.id);
+        }
         
         ProcessedShapeInfo processedInfo = {
             .triGeometryIndex = triGeometryIndex,
-            .lineGeometryIndex = lineGeometryIndex
+            .lineGeometryIndex = lineGeometryIndex,
+            .pointGeometryIndex = pointGeometryIndex
         };
         processedShapeMap[shape.TShape().get()] = processedInfo;
         return processedInfo;
@@ -425,6 +475,7 @@ private:
             // resolve primitive index
             Standard_Integer triGeometryIndex = -1;
             Standard_Integer lineGeometryIndex = -1;
+            Standard_Integer pointGeometryIndex = -1;
             if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID) {
                 // resolve sub-shapes if compound shape
                 TopoDS_Iterator it(shape);
@@ -435,6 +486,7 @@ private:
                 ProcessedShapeInfo processedInfo = triangulateShape(shape);
                 triGeometryIndex = processedInfo.triGeometryIndex;
                 lineGeometryIndex = processedInfo.lineGeometryIndex;
+                pointGeometryIndex = processedInfo.pointGeometryIndex;
             }
 
             meshes.push_back(Mesh(
@@ -443,6 +495,7 @@ private:
                 shapeType,
                 triGeometryIndex,
                 lineGeometryIndex,
+                pointGeometryIndex,
                 materialIndex,
                 parentMeshIndex
             ));

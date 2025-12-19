@@ -99,6 +99,21 @@ public:
     Float32Array getColor() const;
 };
 
+class PointGeometry {
+public:
+    std::vector<float> positions;
+
+public:
+    PointGeometry() = default;
+    PointGeometry(std::vector<float> positions)
+        : positions(std::move(positions))
+    {
+        positions.shrink_to_fit();
+    }
+
+    Float32Array getPositions() const;
+};
+
 enum class MeshShapeType {
     Shell, // represented as tri and line
     Solid, // represented as tri and line
@@ -115,6 +130,7 @@ private:
     MeshShapeType shapeType;
     int triGeometryIndex;
     int lineGeometryIndex;
+    int pointGeometryIndex;
     int materialIndex;
     int parentMeshIndex;
 
@@ -125,6 +141,7 @@ public:
         MeshShapeType shapeType,
         int triGeometryIndex,
         int lineGeometryIndex,
+        int pointGeometryIndex,
         int materialIndex,
         int parentMeshIndex
     )
@@ -133,6 +150,7 @@ public:
         , shapeType(shapeType)
         , triGeometryIndex(triGeometryIndex)
         , lineGeometryIndex(lineGeometryIndex)
+        , pointGeometryIndex(pointGeometryIndex)
         , materialIndex(materialIndex)
         , parentMeshIndex(parentMeshIndex)
     {
@@ -142,6 +160,7 @@ public:
     MeshShapeType getShapeType() const;
     int getTriGeometryIndex() const;
     int getLineGeometryIndex() const;
+    int getPointGeometryIndex() const;
     int getMaterialIndex() const;
     int getParentMeshIndex() const;
 };
@@ -150,6 +169,7 @@ class TriangulatedModel {
 private:
     std::vector<TriGeometry> tris;
     std::vector<LineGeometry> lines;
+    std::vector<PointGeometry> points;
     std::vector<Material> materials;
     std::vector<Mesh> meshes;
     
@@ -157,16 +177,19 @@ public:
     TriangulatedModel(
         std::vector<TriGeometry> tris,
         std::vector<LineGeometry> lines,
+        std::vector<PointGeometry> points,
         std::vector<Material> materials,
         std::vector<Mesh> meshes
     )
         : tris(std::move(tris))
         , lines(std::move(lines))
+        , points(std::move(points))
         , materials(std::move(materials))
         , meshes(std::move(meshes))
     {
         tris.shrink_to_fit();
         lines.shrink_to_fit();
+        points.shrink_to_fit();
         materials.shrink_to_fit();
         meshes.shrink_to_fit();
     }
@@ -175,6 +198,8 @@ public:
     TriGeometry& getTri(size_t index);
     size_t getLineCount() const;
     LineGeometry& getLine(size_t index);
+    size_t getPointCount() const;
+    PointGeometry& getPoint(size_t index);
     size_t getMaterialCount() const;
     Material& getMaterial(size_t index);
     size_t getMeshCount() const;
