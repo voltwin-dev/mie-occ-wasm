@@ -73,7 +73,7 @@ jobs:
           echo "bump_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.6
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Install build tools
         run: |
