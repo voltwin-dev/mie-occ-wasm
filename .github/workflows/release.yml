@@ -65,8 +65,8 @@ jobs:
           TAG="v${VERSION}"
 
           git add package.json package-lock.json
-          git commit -m "chore(release): bump mie-occ-wasm to ${TAG}"
-          git push origin "HEAD:${DEV_BRANCH}"
+          git commit -m "Bump version to ${TAG}"
+          git push origin ${DEV_BRANCH}
 
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
@@ -105,12 +105,9 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.bump.outputs.tag }}"
 
-          git fetch origin "${MAIN_BRANCH}:${MAIN_BRANCH}"
-          git fetch origin "${DEV_BRANCH}:${DEV_BRANCH}"
-
+          git fetch origin
           git checkout "${MAIN_BRANCH}"
           git pull --ff-only origin "${MAIN_BRANCH}"
-
           git merge --no-ff "${DEV_BRANCH}" -m "chore(release): merge ${DEV_BRANCH} for ${TAG}"
           git tag "${TAG}"
 
@@ -153,7 +150,7 @@ jobs:
             exit 0
           fi
 
-          git fetch origin "${DEV_BRANCH}:${DEV_BRANCH}"
+          git fetch origin
           git checkout "${DEV_BRANCH}"
           git pull --ff-only origin "${DEV_BRANCH}"
 
