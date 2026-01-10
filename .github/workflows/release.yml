@@ -87,7 +87,8 @@ jobs:
         run: npm run build
         env:
           SCCACHE_GHA_ENABLED: "true"
-          EM_COMPILER_WRAPPER: sccache
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
 
       - name: Archive build/target
         id: archive
