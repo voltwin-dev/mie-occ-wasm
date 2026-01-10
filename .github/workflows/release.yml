@@ -13,6 +13,9 @@ on:
           - minor
           - patch
 
+env:
+  SCCACHE_GHA_ENABLED: "true"
+
 permissions:
   contents: write # push merge commit, push tags, create GitHub Release
 
@@ -86,7 +89,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          SCCACHE_GHA_ENABLED: "true"
           EM_COMPILER_WRAPPER: sccache
 
       - name: Archive build/target
