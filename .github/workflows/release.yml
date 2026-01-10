@@ -94,8 +94,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.bump.outputs.version }}"
-          ARCHIVE="mie-occ-wasm-${VERSION}-build-target.tar.gz"
-          tar -czf "${ARCHIVE}" -C build target
+          ARCHIVE="mie-occ-wasm@${VERSION}.tar.gz"
+          tar -czf "${ARCHIVE}" -C ../src occ_wasm
           echo "archive=${ARCHIVE}" >> "${GITHUB_OUTPUT}"
 
       - name: Merge dev into main + tag
