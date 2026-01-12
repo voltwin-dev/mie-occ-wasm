@@ -13,15 +13,16 @@ on:
           - minor
           - patch
 
-env:
-  SCCACHE_GHA_ENABLED: "true"
-
 permissions:
   contents: write # push merge commit, push tags, create GitHub Release
 
 concurrency:
   group: mie-occ-wasm-release-${{ github.ref }}
   cancel-in-progress: false
+
+env:
+  EM_VERSION: "4.0.15"
+  EM_CACHE: "${{ github.workspace }}/.emscripten_cache"
 
 jobs:
   release:
@@ -75,9 +76,6 @@ jobs:
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "bump_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -85,6 +83,14 @@ jobs:
 
       - name: Setup emsdk + occt
         run: npm run setup
+        
+      - name: Restore Emscripten cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.EM_CACHE }}
+          key: emcache-${{ env.EM_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+          restore-keys: |
+            emcache-${{ env.EM_VERSION }}-${{ runner.os }}-
 
       - name: Build
         run: npm run build
