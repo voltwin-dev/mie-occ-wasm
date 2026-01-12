@@ -98,7 +98,6 @@ source_group("OCCT" FILES ${MIE_OCCT_SOURCE_FILES})
 if(EMSCRIPTEN)
     set(MIE_SHARED_COMPILE_FLAGS)
     list(APPEND MIE_SHARED_COMPILE_FLAGS
-        --cache sccache
         -O3
         -flto
     )
