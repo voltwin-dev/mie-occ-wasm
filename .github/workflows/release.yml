@@ -22,7 +22,6 @@ concurrency:
 
 env:
   EM_VERSION: "4.0.15"
-  EM_CACHE: "${{ github.workspace }}/.emscripten_cache"
 
 jobs:
   release:
@@ -87,7 +86,7 @@ jobs:
       - name: Restore Emscripten cache
         uses: actions/cache@v5
         with:
-          path: ${{ env.EM_CACHE }}
+          path: build/target
           key: emcache-${{ env.EM_VERSION }}-${{ runner.os }}-${{ runner.arch }}
           restore-keys: |
             emcache-${{ env.EM_VERSION }}-${{ runner.os }}-
