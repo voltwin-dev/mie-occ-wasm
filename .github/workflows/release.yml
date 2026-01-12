@@ -92,13 +92,8 @@ jobs:
           restore-keys: |
             emcache-${{ env.EM_VERSION }}-${{ runner.os }}-
 
-      - name: Ensure cache directory exists
-        run: mkdir -p "${{ env.EM_CACHE }}"
-
       - name: Build
         run: npm run build
-        env:
-          EM_COMPILER_WRAPPER: sccache
 
       - name: Archive build/target
         id: archive
