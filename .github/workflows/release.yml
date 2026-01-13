@@ -79,17 +79,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build
-
-      - name: Setup emsdk + occt
-        run: npm run setup
         
-      - name: Restore Emscripten cache
+      - name: Restore Build Cache
         uses: actions/cache@v5
         with:
-          path: build/target
+          path: build
           key: emcache-${{ env.EM_VERSION }}-${{ runner.os }}-${{ runner.arch }}
           restore-keys: |
             emcache-${{ env.EM_VERSION }}-${{ runner.os }}-
+
+      - name: Setup emsdk + occt
+        run: npm run setup
 
       - name: Build
         run: npm run build
