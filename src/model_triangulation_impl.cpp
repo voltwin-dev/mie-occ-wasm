@@ -218,10 +218,10 @@ private:
                 TopAbs_Orientation faceOrientation = face.Orientation();
                 Standard_Size indexOffset = static_cast<Standard_Size>(triData.positions.size() / 3);
 
-                // triData.submeshIndices.push_back(static_cast<uint32_t>(indexOffset)); // vertex start
-                triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbNodes())); // vertex count
-                // triData.submeshIndices.push_back(static_cast<uint32_t>(triData.indices.size())); // index start
-                // triData.submeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
+                // triData.subMeshIndices.push_back(static_cast<uint32_t>(indexOffset)); // vertex start
+                triData.subMeshIndices.push_back(static_cast<uint32_t>(polyTri->NbNodes())); // vertex count
+                // triData.subMeshIndices.push_back(static_cast<uint32_t>(triData.indices.size())); // index start
+                // triData.subMeshIndices.push_back(static_cast<uint32_t>(polyTri->NbTriangles() * 3)); // index count
 
                 for (Standard_Integer i = 1; i <= polyTri->NbNodes(); ++i) {
                     gp_Pnt pnt = polyTri->Node(i).Transformed(relativeTransform);
@@ -303,8 +303,8 @@ private:
                         if (!polypolyTri.IsNull()) {
                             if (polypolyTri->NbNodes() < 2) continue; // NOTE: this might be unreachable
 
-                            // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                            lineData.submeshIndices.push_back(static_cast<uint32_t>((polypolyTri->NbNodes() - 1) * 2)); // vertex count
+                            // lineData.subMeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                            lineData.subMeshIndices.push_back(static_cast<uint32_t>((polypolyTri->NbNodes() - 1) * 2)); // vertex count
 
                             const TColStd_Array1OfInteger& nodes = polypolyTri->Nodes();
                             for (Standard_Integer i = nodes.Lower(); i < nodes.Upper(); ++i) {
@@ -331,8 +331,8 @@ private:
                         GCPnts_TangentialDeflection points(curve, ANGLE_DEFLECTION, deflection);
                         if (points.NbPoints() < 2) continue; // NOTE: this might be unreachable
 
-                        // lineData.submeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
-                        lineData.submeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
+                        // lineData.subMeshIndices.push_back(static_cast<uint32_t>(lineData.positions.size() / 3)); // vertex start
+                        lineData.subMeshIndices.push_back(static_cast<uint32_t>((points.NbPoints() - 1) * 2)); // vertex count
 
                         for (Standard_Integer i = 1; i < points.NbPoints(); ++i) {
                             gp_Pnt pnt1 = points.Value(i);
