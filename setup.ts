@@ -49,7 +49,7 @@ const tasks: InstallTask[] = [
     }
 ];
 
-async function run() {
+async function run(): Promise<void> {
     for (const task of tasks) {
         if (!fs.existsSync(task.targetDir)) {
             console.log(`Cloning ${task.name}...`);
