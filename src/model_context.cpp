@@ -38,8 +38,8 @@ Uint32Array TriGeometry::getIndices() const {
     return Uint32Array(emscripten::val(view));
 }
 
-Uint32Array TriGeometry::getSubmeshIndices() const {
-    emscripten::memory_view view(submeshIndices.size(), reinterpret_cast<const uint32_t*>(submeshIndices.data()));
+Uint32Array TriGeometry::getSubMeshIndices() const {
+    emscripten::memory_view view(subMeshIndices.size(), reinterpret_cast<const uint32_t*>(subMeshIndices.data()));
     return Uint32Array(emscripten::val(view));
 }
 
@@ -50,8 +50,8 @@ Float32Array LineGeometry::getPositions() const {
     return Float32Array(emscripten::val(view));
 }
 
-Uint32Array LineGeometry::getSubmeshIndices() const {
-    emscripten::memory_view view(submeshIndices.size(), reinterpret_cast<const uint32_t*>(submeshIndices.data()));
+Uint32Array LineGeometry::getSubMeshIndices() const {
+    emscripten::memory_view view(subMeshIndices.size(), reinterpret_cast<const uint32_t*>(subMeshIndices.data()));
     return Uint32Array(emscripten::val(view));
 }
 
@@ -179,11 +179,11 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getNormals", &TriGeometry::getNormals)
         .function("getUVs", &TriGeometry::getUVs)
         .function("getIndices", &TriGeometry::getIndices)
-        .function("getSubmeshIndices", &TriGeometry::getSubmeshIndices);
+        .function("getSubMeshIndices", &TriGeometry::getSubMeshIndices);
 
     emscripten::class_<LineGeometry>("LineGeometry")
         .function("getPositions", &LineGeometry::getPositions)
-        .function("getSubmeshIndices", &LineGeometry::getSubmeshIndices);
+        .function("getSubMeshIndices", &LineGeometry::getSubMeshIndices);
 
     emscripten::class_<PointGeometry>("PointGeometry")
         .function("getPositions", &PointGeometry::getPositions);

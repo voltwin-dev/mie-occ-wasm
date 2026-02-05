@@ -33,7 +33,7 @@ public:
     std::vector<float> normals;
     std::vector<float> uvs;
     std::vector<uint32_t> indices; // triangle indices
-    std::vector<uint32_t> submeshIndices; // verticesCount
+    std::vector<uint32_t> subMeshIndices; // verticesCount
 
 public:
     TriGeometry() = default;
@@ -42,48 +42,48 @@ public:
         std::vector<float> normals,
         std::vector<float> uvs,
         std::vector<uint32_t> indices,
-        std::vector<uint32_t> submeshIndices
+        std::vector<uint32_t> subMeshIndices
     )
         : positions(std::move(positions))
         , normals(std::move(normals))
         , uvs(std::move(uvs))
         , indices(std::move(indices))
-        , submeshIndices(std::move(submeshIndices))
+        , subMeshIndices(std::move(subMeshIndices))
     {
         positions.shrink_to_fit();
         normals.shrink_to_fit();
         uvs.shrink_to_fit();
         indices.shrink_to_fit();
-        submeshIndices.shrink_to_fit();
+        subMeshIndices.shrink_to_fit();
     }
 
     Float32Array getPositions() const;
     Float32Array getNormals() const;
     Float32Array getUVs() const;
     Uint32Array getIndices() const;
-    Uint32Array getSubmeshIndices() const;
+    Uint32Array getSubMeshIndices() const;
 };
 
 class LineGeometry {
 public:
     std::vector<float> positions;
-    std::vector<uint32_t> submeshIndices; // verticesCount
+    std::vector<uint32_t> subMeshIndices; // verticesCount
 
 public:
     LineGeometry() = default;
     LineGeometry(
         std::vector<float> positions,
-        std::vector<uint32_t> submeshIndices
+        std::vector<uint32_t> subMeshIndices
     )
         : positions(std::move(positions))
-        , submeshIndices(std::move(submeshIndices))
+        , subMeshIndices(std::move(subMeshIndices))
     {
         positions.shrink_to_fit();
-        submeshIndices.shrink_to_fit();
+        subMeshIndices.shrink_to_fit();
     }
 
     Float32Array getPositions() const;
-    Uint32Array getSubmeshIndices() const;
+    Uint32Array getSubMeshIndices() const;
 };
 
 class Material {
