@@ -1,6 +1,6 @@
 {
     "name": "mie-occ-wasm",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "scripts": {
         "setup": "ts-node setup.ts",
         "build:release:single": "cmake --preset release-single && cmake --build --preset release-single",
