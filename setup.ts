@@ -47,7 +47,7 @@ const tasks: InstallTask[] = [
         key: "occt",
         name: "Open CASCADE Technology",
         repository: "https://github.com/Open-Cascade-SAS/OCCT.git",
-        tag: "V7_9_1",
+        tag: "V7_9_3",
         targetDir: OCCT_DIR,
         commands: []
     }
