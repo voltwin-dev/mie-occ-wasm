@@ -8,6 +8,7 @@
 #include "model_triangulation_impl.hpp"
 
 #include <array>
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -25,12 +26,16 @@
 #include <gp_Pnt.hxx>
 #include <Poly_Triangulation.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
+#include <Precision.hxx>
 #include <Prs3d.hxx>
 #include <Quantity_Color.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDF_ChildIterator.hxx>
 #include <TDF_Label.hxx>
+#include <TDF_LabelSequence.hxx>
+#include <TDF_Tool.hxx>
+#include <TCollection_AsciiString.hxx>
 #include <TopAbs_Orientation.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
@@ -99,7 +104,7 @@ public:
             TopoDS_Shape shape;
             if (shapeTool->GetShape(childLabel, shape) && shapeTool->IsFree(childLabel)) {
                 // free shapes (root nodes)
-                resolveShapeTree(shape);
+                resolveShapeTree(shape, childLabel);
             }
         }
         
@@ -147,6 +152,176 @@ private:
             resolvedLabel = refLabel;
         }
         return resolvedLabel;
+    }
+
+    std::string getLabelEntry(const TDF_Label& label) const {
+        if (label.IsNull()) {
+            return std::string();
+        }
+        TCollection_AsciiString entry;
+        TDF_Tool::Entry(label, entry);
+        return entry.ToCString();
+    }
+
+    std::string appendOccurrencePath(
+        const std::string& parentPath,
+        const TDF_Label& componentLabel
+    ) const {
+        const std::string entry = getLabelEntry(componentLabel);
+        if (parentPath.empty()) {
+            return entry;
+        }
+        return parentPath + "/" + entry;
+    }
+
+    TopoDS_Shape removeOccurrenceLocation(
+        const TopoDS_Shape& shape,
+        const gp_Trsf& occurrenceWorldTransform,
+        const bool hasOccurrence
+    ) const {
+        if (!hasOccurrence) {
+            return shape;
+        }
+        TopoDS_Shape definitionShape = shape;
+        const gp_Trsf definitionTransform = occurrenceWorldTransform
+            .Inverted()
+            .Multiplied(shape.Location().Transformation());
+        definitionShape.Location(TopLoc_Location(definitionTransform));
+        return definitionShape;
+    }
+
+    bool transformsEquivalent(
+        const gp_Trsf& left,
+        const gp_Trsf& right
+    ) const {
+        for (Standard_Integer row = 1; row <= 3; ++row) {
+            for (Standard_Integer column = 1; column <= 4; ++column) {
+                if (
+                    std::abs(left.Value(row, column) - right.Value(row, column))
+                    > Precision::Confusion()
+                ) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool shapesEquivalent(
+        const TopoDS_Shape& left,
+        const TopoDS_Shape& right
+    ) const {
+        if (left.IsNull() || right.IsNull()) {
+            return false;
+        }
+        TopoDS_Shape unlocatedLeft = left;
+        TopoDS_Shape unlocatedRight = right;
+        unlocatedLeft.Location(TopLoc_Location());
+        unlocatedRight.Location(TopLoc_Location());
+        return (
+            unlocatedLeft.IsPartner(unlocatedRight)
+            && transformsEquivalent(
+                left.Location().Transformation(),
+                right.Location().Transformation()
+            )
+        );
+    }
+
+    TDF_Label findDefinitionShapeLabel(
+        const TDF_Label& definitionLabel,
+        const TopoDS_Shape& shape,
+        const gp_Trsf& occurrenceWorldTransform,
+        const bool hasOccurrence
+    ) const {
+        if (definitionLabel.IsNull()) {
+            return TDF_Label();
+        }
+        const TopoDS_Shape definitionShape = removeOccurrenceLocation(
+            shape,
+            occurrenceWorldTransform,
+            hasOccurrence
+        );
+        const TopoDS_Shape definitionRoot = shapeTool->GetShape(definitionLabel);
+        if (shapesEquivalent(definitionRoot, definitionShape)) {
+            return definitionLabel;
+        }
+        TDF_Label subshapeLabel;
+        if (shapeTool->FindSubShape(definitionLabel, definitionShape, subshapeLabel)) {
+            return subshapeLabel;
+        }
+        TDF_LabelSequence subshapeLabels;
+        if (shapeTool->GetSubShapes(definitionLabel, subshapeLabels)) {
+            for (
+                Standard_Integer index = 1;
+                index <= subshapeLabels.Length();
+                ++index
+            ) {
+                const TDF_Label candidateLabel = subshapeLabels.Value(index);
+                if (
+                    shapesEquivalent(
+                        shapeTool->GetShape(candidateLabel),
+                        definitionShape
+                    )
+                ) {
+                    return candidateLabel;
+                }
+            }
+        }
+        return TDF_Label();
+    }
+
+    TDF_Label findAssemblyComponent(
+        const TDF_Label& assemblyDefinitionLabel,
+        const TopoDS_Shape& childShape,
+        const gp_Trsf& assemblyWorldTransform
+    ) const {
+        if (
+            assemblyDefinitionLabel.IsNull()
+            || !shapeTool->IsAssembly(assemblyDefinitionLabel)
+        ) {
+            return TDF_Label();
+        }
+        TopoDS_Shape relativeChild = childShape;
+        const gp_Trsf relativeTransform = assemblyWorldTransform
+            .Inverted()
+            .Multiplied(childShape.Location().Transformation());
+        relativeChild.Location(TopLoc_Location(relativeTransform));
+
+        TDF_LabelSequence components;
+        shapeTool->GetComponents(assemblyDefinitionLabel, components);
+        for (Standard_Integer index = 1; index <= components.Length(); ++index) {
+            const TDF_Label componentLabel = components.Value(index);
+            const TopoDS_Shape componentShape = shapeTool->GetShape(componentLabel);
+            if (shapesEquivalent(componentShape, relativeChild)) {
+                return componentLabel;
+            }
+        }
+        return TDF_Label();
+    }
+
+    std::vector<std::string> findFaceShapeLabels(
+        const TopoDS_Shape& shape,
+        const TDF_Label& definitionLabel,
+        const gp_Trsf& occurrenceWorldTransform,
+        const bool hasOccurrence
+    ) const {
+        std::vector<std::string> labels;
+        TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
+        for (; faceExplorer.More(); faceExplorer.Next()) {
+            const TopoDS_Face& face = TopoDS::Face(faceExplorer.Current());
+            TopLoc_Location location;
+            const Handle(Poly_Triangulation) triangulation =
+                BRep_Tool::Triangulation(face, location);
+            if (!triangulation.IsNull()) {
+                labels.push_back(getLabelEntry(findDefinitionShapeLabel(
+                    definitionLabel,
+                    face,
+                    occurrenceWorldTransform,
+                    hasOccurrence
+                )));
+            }
+        }
+        return labels;
     }
 
     bool getLabelColor(const TDF_Label& label, Quantity_Color& color) const {
@@ -412,17 +587,43 @@ private:
         return processedInfo;
     }
 
-    void resolveShapeTree(const TopoDS_Shape& rootShape) {
+    void resolveShapeTree(
+        const TopoDS_Shape& rootShape,
+        const TDF_Label& rootLabel
+    ) {
         struct StackFrame {
             TopoDS_Shape shape;
             Standard_Integer parentMeshIndex;
             gp_Trsf parentWorldTransform;
+            TDF_Label definitionLabel;
+            std::string assemblyPath;
+            std::string occurrencePath;
+            gp_Trsf occurrenceWorldTransform;
+            bool hasOccurrence;
         };
         std::vector<StackFrame> stack;
-        stack.push_back({ rootShape, -1, gp_Trsf() });
+        stack.push_back({
+            rootShape,
+            -1,
+            gp_Trsf(),
+            resolveReferredShapeLabel(rootLabel),
+            getLabelEntry(rootLabel),
+            std::string(),
+            gp_Trsf(),
+            false
+        });
 
         while (!stack.empty()) {
-            auto [shape, parentMeshIndex, parentWorldTransform] = stack.back();
+            auto [
+                shape,
+                parentMeshIndex,
+                parentWorldTransform,
+                definitionLabel,
+                assemblyPath,
+                occurrencePath,
+                occurrenceWorldTransform,
+                hasOccurrence
+            ] = stack.back();
             stack.pop_back();
 
             Standard_Integer meshIndex = static_cast<Standard_Integer>(meshes.size());
@@ -476,19 +677,67 @@ private:
             Standard_Integer triGeometryIndex = -1;
             Standard_Integer lineGeometryIndex = -1;
             Standard_Integer pointGeometryIndex = -1;
+            std::vector<std::string> faceShapeLabels;
             if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID) {
                 // resolve sub-shapes if compound shape
                 TopoDS_Iterator it(shape);
                 for (; it.More(); it.Next()) {
-                    stack.push_back({ it.Value(), meshIndex, shapeTransform });
+                    const TopoDS_Shape childShape = it.Value();
+                    TDF_Label childDefinitionLabel = definitionLabel;
+                    std::string childAssemblyPath = assemblyPath;
+                    std::string childOccurrencePath = occurrencePath;
+                    gp_Trsf childOccurrenceWorldTransform = occurrenceWorldTransform;
+                    bool childHasOccurrence = hasOccurrence;
+
+                    const TDF_Label componentLabel = findAssemblyComponent(
+                        definitionLabel,
+                        childShape,
+                        shapeTransform
+                    );
+                    if (!componentLabel.IsNull()) {
+                        childAssemblyPath = appendOccurrencePath(
+                            assemblyPath,
+                            componentLabel
+                        );
+                        childOccurrencePath = childAssemblyPath;
+                        childDefinitionLabel = resolveReferredShapeLabel(componentLabel);
+                        childOccurrenceWorldTransform = childShape
+                            .Location()
+                            .Transformation();
+                        childHasOccurrence = true;
+                    }
+                    stack.push_back({
+                        childShape,
+                        meshIndex,
+                        shapeTransform,
+                        childDefinitionLabel,
+                        std::move(childAssemblyPath),
+                        std::move(childOccurrencePath),
+                        childOccurrenceWorldTransform,
+                        childHasOccurrence
+                    });
                 }
             } else if (shape.ShapeType() == TopAbs_SOLID || shape.ShapeType() == TopAbs_SHELL) {
                 ProcessedShapeInfo processedInfo = triangulateShape(shape);
                 triGeometryIndex = processedInfo.triGeometryIndex;
                 lineGeometryIndex = processedInfo.lineGeometryIndex;
                 pointGeometryIndex = processedInfo.pointGeometryIndex;
+                if (triGeometryIndex >= 0) {
+                    faceShapeLabels = findFaceShapeLabels(
+                        shape,
+                        definitionLabel,
+                        occurrenceWorldTransform,
+                        hasOccurrence
+                    );
+                }
             }
 
+            const std::string shapeLabel = getLabelEntry(findDefinitionShapeLabel(
+                definitionLabel,
+                shape,
+                occurrenceWorldTransform,
+                hasOccurrence
+            ));
             meshes.push_back(Mesh(
                 std::move(shapeName),
                 matrixArray,
@@ -497,7 +746,10 @@ private:
                 lineGeometryIndex,
                 pointGeometryIndex,
                 materialIndex,
-                parentMeshIndex
+                parentMeshIndex,
+                std::move(occurrencePath),
+                shapeLabel,
+                std::move(faceShapeLabels)
             ));
         }
     }

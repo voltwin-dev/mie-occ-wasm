@@ -133,6 +133,9 @@ private:
     int pointGeometryIndex;
     int materialIndex;
     int parentMeshIndex;
+    std::string occurrencePath;
+    std::string shapeLabel;
+    std::vector<std::string> faceShapeLabels;
 
 public:
     Mesh(
@@ -143,7 +146,10 @@ public:
         int lineGeometryIndex,
         int pointGeometryIndex,
         int materialIndex,
-        int parentMeshIndex
+        int parentMeshIndex,
+        std::string occurrencePath,
+        std::string shapeLabel,
+        std::vector<std::string> faceShapeLabels
     )
         : name(std::move(name))
         , transform(transform)
@@ -153,7 +159,11 @@ public:
         , pointGeometryIndex(pointGeometryIndex)
         , materialIndex(materialIndex)
         , parentMeshIndex(parentMeshIndex)
+        , occurrencePath(std::move(occurrencePath))
+        , shapeLabel(std::move(shapeLabel))
+        , faceShapeLabels(std::move(faceShapeLabels))
     {
+        this->faceShapeLabels.shrink_to_fit();
     }
     const std::string& getName() const;
     Float32Array getTransform() const;
@@ -163,6 +173,10 @@ public:
     int getPointGeometryIndex() const;
     int getMaterialIndex() const;
     int getParentMeshIndex() const;
+    const std::string& getOccurrencePath() const;
+    const std::string& getShapeLabel() const;
+    size_t getFaceShapeLabelCount() const;
+    const std::string& getFaceShapeLabel(size_t index) const;
 };
 
 class TriangulatedModel {

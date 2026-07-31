@@ -39,6 +39,9 @@ set(MIE_OCCT_TOOLKITS
     TKLCAF # for TDF_LabelSequence.hxx
     TKXCAF # for XCAFDoc_DataMapOfShapeLabel.hxx
     TKDESTEP # for STEPControl_Reader.hxx
+    TKBinL # for BinLDrivers.hxx
+    TKBin # for BinDrivers.hxx
+    TKBinXCAF # for BinXCAFDrivers.hxx
 
     # Search from TDocStd_Document deps
     TKCDF # for CDM_Document.hxx
