@@ -102,11 +102,13 @@ if(EMSCRIPTEN)
     set(MIE_SHARED_COMPILE_FLAGS)
     list(APPEND MIE_SHARED_COMPILE_FLAGS
         --cache .emscripten_cache
-        -O3
-        -flto
     )
+    # CMake already adds -g for Debug. Keep LTO release-only so wasm-ld does not
+    # need to optimize the full debug-symbol OCCT archive in memory.
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         list(APPEND MIE_SHARED_COMPILE_FLAGS
+            -O3
+            -flto
             -sDISABLE_EXCEPTION_CATCHING=1
         )
     else()
