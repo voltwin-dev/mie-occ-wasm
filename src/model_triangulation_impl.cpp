@@ -394,7 +394,12 @@ private:
             TopLoc_Location location;
             const Handle(Poly_Triangulation) triangulation =
                 BRep_Tool::Triangulation(face, location);
-            if (triangulation.IsNull() || triangulation->NbTriangles() <= 0) {
+            if (
+                triangulation.IsNull()
+                || triangulation->NbNodes() <= 0
+                || triangulation->NbTriangles() <= 0
+                || !triangulation->HasUVNodes()
+            ) {
                 return false;
             }
         }
@@ -428,6 +433,10 @@ private:
         // remain supported through the existing local tessellation fallback.
         if (!hasCompleteFaceTriangulation(shape)) {
             ++runtimeTessellationCount;
+            // Do not mix partial/foreign caches with triangles made using the
+            // MIE profile. A face with triangles but no UV nodes would otherwise
+            // survive IncrementalMesh and fail later when UVNode() is consumed.
+            BRepTools::Clean(shape, Standard_True);
             BRepMesh_IncrementalMesh mesh(
                 shape, // The shape to mesh
                 deflection, // Linear deflection
