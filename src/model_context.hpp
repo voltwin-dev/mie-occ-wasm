@@ -186,6 +186,7 @@ private:
     std::vector<PointGeometry> points;
     std::vector<Material> materials;
     std::vector<Mesh> meshes;
+    size_t runtimeTessellationCount;
     
 public:
     TriangulatedModel(
@@ -193,13 +194,15 @@ public:
         std::vector<LineGeometry> lines,
         std::vector<PointGeometry> points,
         std::vector<Material> materials,
-        std::vector<Mesh> meshes
+        std::vector<Mesh> meshes,
+        size_t runtimeTessellationCount
     )
         : tris(std::move(tris))
         , lines(std::move(lines))
         , points(std::move(points))
         , materials(std::move(materials))
         , meshes(std::move(meshes))
+        , runtimeTessellationCount(runtimeTessellationCount)
     {
         tris.shrink_to_fit();
         lines.shrink_to_fit();
@@ -218,6 +221,7 @@ public:
     Material& getMaterial(size_t index);
     size_t getMeshCount() const;
     Mesh& getMesh(size_t index);
+    size_t getRuntimeTessellationCount() const;
 };
 
 #ifdef __EMSCRIPTEN_PTHREADS__

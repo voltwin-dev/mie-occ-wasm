@@ -81,7 +81,11 @@ private:
     std::unordered_map<TopoDS_TShape*, LineGeometryInfo> lineGeometryMap;
     std::unordered_map<TopoDS_TShape*, PointGeometryInfo> pointGeometryMap;
     std::unordered_map<TDF_Label, MaterialInfo> materialMap;
+    using SubshapeLabelBuckets =
+        std::unordered_map<TopoDS_TShape*, std::vector<TDF_Label>>;
+    std::unordered_map<TDF_Label, SubshapeLabelBuckets> subshapeLabelCache;
     std::vector<Mesh> meshes;
+    Standard_Size runtimeTessellationCount = 0;
 
     // for triangulation processing
     std::unordered_map<TopoDS_TShape*, ProcessedShapeInfo> processedShapeMap;
@@ -124,6 +128,7 @@ public:
         std::vector<Material> materials(materialMap.size());
         for (const auto& [_, matInfo] : materialMap) materials[matInfo.id] = std::move(matInfo.material);
         materialMap.clear();
+        subshapeLabelCache.clear();
 
         // clean up triangulation data to save memory
         for (TDF_ChildIterator it(shapeTool->Label()); it.More(); it.Next()) {
@@ -139,7 +144,8 @@ public:
             std::move(lines),
             std::move(points),
             std::move(materials),
-            std::move(meshes)
+            std::move(meshes),
+            runtimeTessellationCount
         );
     }
 
@@ -227,12 +233,41 @@ private:
         );
     }
 
+    const SubshapeLabelBuckets& getSubshapeLabelBuckets(
+        const TDF_Label& definitionLabel
+    ) {
+        const auto [cacheIt, inserted] = subshapeLabelCache.try_emplace(
+            definitionLabel
+        );
+        if (inserted) {
+            TDF_LabelSequence subshapeLabels;
+            if (shapeTool->GetSubShapes(definitionLabel, subshapeLabels)) {
+                for (
+                    Standard_Integer index = 1;
+                    index <= subshapeLabels.Length();
+                    ++index
+                ) {
+                    const TDF_Label candidateLabel = subshapeLabels.Value(index);
+                    const TopoDS_Shape candidateShape = shapeTool->GetShape(
+                        candidateLabel
+                    );
+                    if (!candidateShape.IsNull()) {
+                        cacheIt->second[candidateShape.TShape().get()].push_back(
+                            candidateLabel
+                        );
+                    }
+                }
+            }
+        }
+        return cacheIt->second;
+    }
+
     TDF_Label findDefinitionShapeLabel(
         const TDF_Label& definitionLabel,
         const TopoDS_Shape& shape,
         const gp_Trsf& occurrenceWorldTransform,
         const bool hasOccurrence
-    ) const {
+    ) {
         if (definitionLabel.IsNull()) {
             return TDF_Label();
         }
@@ -245,27 +280,30 @@ private:
         if (shapesEquivalent(definitionRoot, definitionShape)) {
             return definitionLabel;
         }
-        TDF_Label subshapeLabel;
-        if (shapeTool->FindSubShape(definitionLabel, definitionShape, subshapeLabel)) {
-            return subshapeLabel;
-        }
-        TDF_LabelSequence subshapeLabels;
-        if (shapeTool->GetSubShapes(definitionLabel, subshapeLabels)) {
-            for (
-                Standard_Integer index = 1;
-                index <= subshapeLabels.Length();
-                ++index
-            ) {
-                const TDF_Label candidateLabel = subshapeLabels.Value(index);
-                if (
-                    shapesEquivalent(
-                        shapeTool->GetShape(candidateLabel),
-                        definitionShape
-                    )
-                ) {
+        const SubshapeLabelBuckets& buckets = getSubshapeLabelBuckets(
+            definitionLabel
+        );
+        const auto candidates = buckets.find(definitionShape.TShape().get());
+        if (candidates != buckets.end()) {
+            for (const TDF_Label& candidateLabel : candidates->second) {
+                if (shapesEquivalent(
+                    shapeTool->GetShape(candidateLabel),
+                    definitionShape
+                )) {
                     return candidateLabel;
                 }
             }
+        }
+        // Raw STEP and legacy XBF inputs may not materialize face labels. Keep
+        // the OCCT lookup as a compatibility fallback, while canonical CATF
+        // XBF resolves through the O(1) TShape bucket above.
+        TDF_Label subshapeLabel;
+        if (shapeTool->FindSubShape(
+            definitionLabel,
+            definitionShape,
+            subshapeLabel
+        )) {
+            return subshapeLabel;
         }
         return TDF_Label();
     }
@@ -304,7 +342,7 @@ private:
         const TDF_Label& definitionLabel,
         const gp_Trsf& occurrenceWorldTransform,
         const bool hasOccurrence
-    ) const {
+    ) {
         std::vector<std::string> labels;
         TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
         for (; faceExplorer.More(); faceExplorer.Next()) {
@@ -347,6 +385,22 @@ private:
         return std::string();
     }
 
+    bool hasCompleteFaceTriangulation(const TopoDS_Shape& shape) const {
+        Standard_Integer faceCount = 0;
+        TopExp_Explorer faceExplorer(shape, TopAbs_FACE);
+        for (; faceExplorer.More(); faceExplorer.Next()) {
+            ++faceCount;
+            const TopoDS_Face& face = TopoDS::Face(faceExplorer.Current());
+            TopLoc_Location location;
+            const Handle(Poly_Triangulation) triangulation =
+                BRep_Tool::Triangulation(face, location);
+            if (triangulation.IsNull() || triangulation->NbTriangles() <= 0) {
+                return false;
+            }
+        }
+        return faceCount > 0;
+    }
+
     // shape must be TopoDS_Shell or TopoDS_Solid
     ProcessedShapeInfo triangulateShape(const TopoDS_Shape& shape) {
         // check if already processed
@@ -368,13 +422,20 @@ private:
         const Standard_Real deflection = Prs3d::GetDeflection(boundBox, DEVIATION_COEFFICIENT, MAXIMAL_CHORDAL_DEVIATION);
         
         constexpr Standard_Real ANGLE_DEFLECTION = 0.2;
-        BRepMesh_IncrementalMesh mesh(
-            shape, // The shape to mesh
-            deflection, // Linear deflection
-            Standard_True,  // Relative
-            ANGLE_DEFLECTION, // Angular deflection
-            Standard_True   // In parallel
-        );
+        // XBF producers may persist a complete Poly_Triangulation display
+        // cache. Reuse it verbatim so loading canonical CAD does not block the
+        // browser on a second OCCT mesh pass. Legacy and third-party XBF files
+        // remain supported through the existing local tessellation fallback.
+        if (!hasCompleteFaceTriangulation(shape)) {
+            ++runtimeTessellationCount;
+            BRepMesh_IncrementalMesh mesh(
+                shape, // The shape to mesh
+                deflection, // Linear deflection
+                Standard_True,  // Relative
+                ANGLE_DEFLECTION, // Angular deflection
+                Standard_True   // In parallel
+            );
+        }
 
         TriGeometry triData;
         LineGeometry lineData;

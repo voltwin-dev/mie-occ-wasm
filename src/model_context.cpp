@@ -162,6 +162,10 @@ Mesh& TriangulatedModel::getMesh(size_t index) {
     return meshes[index];
 }
 
+size_t TriangulatedModel::getRuntimeTessellationCount() const {
+    return runtimeTessellationCount;
+}
+
 // ModelContext methods
 
 void ModelContext::computeTriangulation() {
@@ -239,7 +243,8 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getMaterialCount", &TriangulatedModel::getMaterialCount)
         .function("getMaterial", &TriangulatedModel::getMaterial, emscripten::return_value_policy::reference())
         .function("getMeshCount", &TriangulatedModel::getMeshCount)
-        .function("getMesh", &TriangulatedModel::getMesh, emscripten::return_value_policy::reference());
+        .function("getMesh", &TriangulatedModel::getMesh, emscripten::return_value_policy::reference())
+        .function("getRuntimeTessellationCount", &TriangulatedModel::getRuntimeTessellationCount);
 
     emscripten::register_optional<TriangulatedModel>();
 
