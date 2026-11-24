@@ -104,6 +104,22 @@ int Mesh::getParentMeshIndex() const {
     return parentMeshIndex;
 }
 
+const std::string& Mesh::getOccurrencePath() const {
+    return occurrencePath;
+}
+
+const std::string& Mesh::getShapeLabel() const {
+    return shapeLabel;
+}
+
+size_t Mesh::getFaceShapeLabelCount() const {
+    return faceShapeLabels.size();
+}
+
+const std::string& Mesh::getFaceShapeLabel(size_t index) const {
+    return faceShapeLabels[index];
+}
+
 // TriangulatedModel methods
 
 size_t TriangulatedModel::getTriCount() const {
@@ -144,6 +160,10 @@ size_t TriangulatedModel::getMeshCount() const {
 
 Mesh& TriangulatedModel::getMesh(size_t index) {
     return meshes[index];
+}
+
+size_t TriangulatedModel::getRuntimeTessellationCount() const {
+    return runtimeTessellationCount;
 }
 
 // ModelContext methods
@@ -207,7 +227,11 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getLineGeometryIndex", &Mesh::getLineGeometryIndex)
         .function("getPointGeometryIndex", &Mesh::getPointGeometryIndex)
         .function("getMaterialIndex", &Mesh::getMaterialIndex)
-        .function("getParentMeshIndex", &Mesh::getParentMeshIndex);
+        .function("getParentMeshIndex", &Mesh::getParentMeshIndex)
+        .function("getOccurrencePath", &Mesh::getOccurrencePath)
+        .function("getShapeLabel", &Mesh::getShapeLabel)
+        .function("getFaceShapeLabelCount", &Mesh::getFaceShapeLabelCount)
+        .function("getFaceShapeLabel", &Mesh::getFaceShapeLabel);
 
     emscripten::class_<TriangulatedModel>("TriangulatedModel")
         .function("getTriCount", &TriangulatedModel::getTriCount)
@@ -219,7 +243,8 @@ EMSCRIPTEN_BINDINGS(model_context_module) {
         .function("getMaterialCount", &TriangulatedModel::getMaterialCount)
         .function("getMaterial", &TriangulatedModel::getMaterial, emscripten::return_value_policy::reference())
         .function("getMeshCount", &TriangulatedModel::getMeshCount)
-        .function("getMesh", &TriangulatedModel::getMesh, emscripten::return_value_policy::reference());
+        .function("getMesh", &TriangulatedModel::getMesh, emscripten::return_value_policy::reference())
+        .function("getRuntimeTessellationCount", &TriangulatedModel::getRuntimeTessellationCount);
 
     emscripten::register_optional<TriangulatedModel>();
 
